@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/equipment/equipment_list_bloc.dart';
 import '../../models/ui/equipment.dart';
 import '../../utils/app_theme.dart';
-import '../../widgets/page_scaffold.dart';
+import '../../utils/routes.dart';
 import '../../widgets/data_table_card.dart';
+import '../condition_log/condition_log_list_page.dart';
+import '../category/category_list_page.dart';
 import 'equipment_detail_page.dart';
 
 class EquipmentListPage extends StatefulWidget {
@@ -21,72 +23,141 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppTheme.darkBg : AppTheme.background;
+    final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
+    final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
+
     return BlocProvider.value(
       value: widget.equipmentBloc,
-      child: PageScaffold(
-        title: 'Peralatan Lab',
-        searchHint: 'Cari peralatan...',
-        onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
-        actionLabel: '+ Tambah Alat',
-        onAction: () => _onCreateClick(context),
-        body: BlocBuilder<EquipmentListBloc, EquipmentListState>(
-          builder: (context, state) {
-            final isLoading = state is EquipmentListLoading;
-            List<Equipment> equipments = [];
-            List<dynamic> categories = [];
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header + search + action buttons
+            Container(
+              color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Peralatan Lab', style: TextStyle(
+                          fontFamily: AppTheme.fontFamily, fontSize: 18,
+                          fontWeight: FontWeight.w700, color: textColor)),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => _onCreateClick(context),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Tambah'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Search bar
+                  TextField(
+                    onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+                    style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
+                      color: textColor),
+                    decoration: InputDecoration(
+                      hintText: 'Cari peralatan...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      constraints: const BoxConstraints(maxHeight: 42),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Sub-navigasi
+                  Row(
+                    children: [
+                      _SubNavButton(
+                        icon: Icons.assignment_rounded,
+                        label: 'Kondisi Log',
+                        onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const ConditionLogListPage())),
+                      ),
+                      const SizedBox(width: 8),
+                      _SubNavButton(
+                        icon: Icons.category_rounded,
+                        label: 'Kategori',
+                        onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const CategoryListPage())),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Tabel
+            Expanded(
+              child: BlocBuilder<EquipmentListBloc, EquipmentListState>(
+                builder: (context, state) {
+                  final isLoading = state is EquipmentListLoading;
+                  List<Equipment> equipments = [];
+                  List<dynamic> categories = [];
 
-            if (state is EquipmentListLoaded) {
-              equipments = state.equipments.where((e) =>
-                e.equipmentName.toLowerCase().contains(_searchQuery) ||
-                e.id.toLowerCase().contains(_searchQuery) ||
-                e.location.toLowerCase().contains(_searchQuery)
-              ).toList();
-              categories = state.categories;
-            }
+                  if (state is EquipmentListLoaded) {
+                    equipments = state.equipments.where((e) =>
+                      e.equipmentName.toLowerCase().contains(_searchQuery) ||
+                      e.id.toLowerCase().contains(_searchQuery) ||
+                      e.location.toLowerCase().contains(_searchQuery)
+                    ).toList();
+                    categories = state.categories;
+                  }
 
-            return DataTableCard(
-              isLoading: isLoading,
-              emptyMessage: 'Belum ada data peralatan',
-              emptyIcon: Icons.science_rounded,
-              headers: const ['ID', 'NAMA', 'KATEGORI', 'TERSEDIA', 'TOTAL', 'STATUS', 'LOKASI', 'AKSI'],
-              rows: equipments.map((eq) {
-                final color = AppTheme.getKondisiColor(eq.conditionStatus);
-                String catName = eq.categoryId;
-                try {
-                  catName = categories.firstWhere((c) => c.id == eq.categoryId)?.categoryName ?? eq.categoryId;
-                } catch (_) {}
-
-                return [
-                  Text(eq.id, style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: AppTheme.textSecondary)),
-                  Text(eq.equipmentName, style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600)),
-                  Text(catName, style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: AppTheme.textSecondary)),
-                  Text('${eq.availableQuantity}', style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.success)),
-                  Text('${eq.totalQuantity}', style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13)),
-                  StatusBadge(label: AppTheme.getKondisiLabel(eq.conditionStatus), color: color),
-                  Text(eq.location, style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: AppTheme.textSecondary)),
-                  Row(children: [
-                    ActionButton(icon: Icons.edit_rounded, color: AppTheme.primary, tooltip: 'Edit', onTap: () => _onEditClick(context, eq)),
-                    const SizedBox(width: 6),
-                    ActionButton(icon: Icons.delete_rounded, color: AppTheme.error, tooltip: 'Hapus', onTap: () => _onDeleteClick(context, eq)),
-                  ]),
-                ];
-              }).toList(),
-            );
-          },
+                  return DataTableCard(
+                    isLoading: isLoading,
+                    emptyMessage: 'Belum ada data peralatan',
+                    emptyIcon: Icons.science_rounded,
+                    headers: const ['ID', 'NAMA', 'KATEGORI', 'TERSEDIA', 'TOTAL', 'STATUS', 'LOKASI', 'AKSI'],
+                    rows: equipments.map((eq) {
+                      final color = AppTheme.getKondisiColor(eq.conditionStatus);
+                      String catName = eq.categoryId;
+                      try {
+                        catName = categories.firstWhere((c) => c.id == eq.categoryId)?.categoryName ?? eq.categoryId;
+                      } catch (_) {}
+                      return [
+                        Text(eq.id, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
+                        Text(eq.equipmentName, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+                        Text(catName, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
+                        Text('${eq.availableQuantity}', style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.success)),
+                        Text('${eq.totalQuantity}', style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor)),
+                        StatusBadge(label: AppTheme.getKondisiLabel(eq.conditionStatus), color: color),
+                        Text(eq.location, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
+                        Row(children: [
+                          ActionButton(icon: Icons.edit_rounded, color: AppTheme.primary, tooltip: 'Edit', onTap: () => _onEditClick(context, eq)),
+                          const SizedBox(width: 6),
+                          ActionButton(icon: Icons.delete_rounded, color: AppTheme.error, tooltip: 'Hapus', onTap: () => _onDeleteClick(context, eq)),
+                        ]),
+                      ];
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   void _onCreateClick(BuildContext context) async {
-    var result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const EquipmentDetailPage(equipment: null)));
+    var result = await Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const EquipmentDetailPage(equipment: null)));
     if (result is EquipmentCreatedResult) {
       widget.equipmentBloc.add(AddNewEquipmentEvent(newEquipment: result.equipment));
     }
   }
 
   void _onEditClick(BuildContext context, Equipment eq) async {
-    var result = await Navigator.push(context, MaterialPageRoute(builder: (_) => EquipmentDetailPage(equipment: eq)));
+    var result = await Navigator.push(context,
+      MaterialPageRoute(builder: (_) => EquipmentDetailPage(equipment: eq)));
     if (result is EquipmentUpdatedResult) {
       widget.equipmentBloc.add(UpdateEquipmentEvent(updatedEquipment: result.equipment));
     } else if (result is EquipmentDeletedResult) {
@@ -104,14 +175,33 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _onEditClick(context, eq);
-            },
+            onPressed: () { Navigator.pop(context); _onEditClick(context, eq); },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Hapus'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SubNavButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _SubNavButton({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        side: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFDDD8FF)),
+        foregroundColor: isDark ? AppTheme.primaryLighter : AppTheme.primary,
       ),
     );
   }

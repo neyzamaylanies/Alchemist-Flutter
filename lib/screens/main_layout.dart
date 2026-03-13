@@ -9,15 +9,12 @@ import '../repositories/transaction_repository.dart';
 import '../repositories/student_repository.dart';
 import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
+import '../utils/routes.dart';
 import '../utils/session_helper.dart';
-import '../widgets/app_sidebar.dart';
 import 'home/home_page.dart';
 import 'equipment/equipment_list_page.dart';
 import 'transaction/transaction_list_page.dart';
-import 'student/student_list_page.dart';
-import 'category/category_list_page.dart';
-import 'condition_log/condition_log_list_page.dart';
-import 'user/user_list_page.dart';
+import 'user/user_tab_page.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -28,7 +25,6 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
-  bool _sidebarVisible = true;
 
   final EquipmentListBloc _equipmentBloc = EquipmentListBloc(
     equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
@@ -65,12 +61,12 @@ class _MainLayoutState extends State<MainLayout> {
           studentBloc: _studentBloc,
           onNavigate: (index) => setState(() => _selectedIndex = index),
         );
-      case 1: return TransactionListPage(transactionBloc: _transactionBloc);
-      case 2: return EquipmentListPage(equipmentBloc: _equipmentBloc);
-      case 3: return const ConditionLogListPage();
-      case 4: return StudentListPage(studentBloc: _studentBloc);
-      case 5: return const CategoryListPage();
-      case 6: return const UserListPage();
+      case 1:
+        return TransactionListPage(transactionBloc: _transactionBloc);
+      case 2:
+        return EquipmentListPage(equipmentBloc: _equipmentBloc);
+      case 3:
+        return UserTabPage(studentBloc: _studentBloc);
       default:
         return HomePage(
           equipmentBloc: _equipmentBloc,
@@ -83,6 +79,8 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return MultiBlocProvider(
       providers: [
         BlocProvider<EquipmentListBloc>.value(value: _equipmentBloc),
@@ -90,123 +88,259 @@ class _MainLayoutState extends State<MainLayout> {
         BlocProvider<StudentListBloc>.value(value: _studentBloc),
       ],
       child: Scaffold(
-        body: Row(
-          children: [
-            // Sidebar dengan animasi hide/show
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              width: _sidebarVisible ? 240 : 0,
-              child: _sidebarVisible
-                  ? AppSidebar(
-                      selectedIndex: _selectedIndex,
-                      onItemSelected: (index) => setState(() => _selectedIndex = index),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTopBar(),
-                  Expanded(child: _buildPage()),
-                ],
-              ),
+        appBar: _buildAppBar(context, isDark),
+        body: _buildPage(),
+        bottomNavigationBar: _buildBottomNav(isDark),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    final bgColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
+
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(64),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          border: Border(bottom: BorderSide(color: borderColor)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                // Logo + Nama App
+                Container(
+                  width: 36,
+                  height: 36,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Image.asset(
+                    'assets/images/logo/LogoAlchemist.png',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Alchemist',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Search bar
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      Routes.search,
+                      arguments: '',
+                    ),
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            size: 16,
+                            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Cari peralatan, mahasiswa...',
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 12,
+                              color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Profile avatar + dropdown
+                _ProfileDropdown(isDark: isDark),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTopBar() {
-    final titles = [
-      'Dashboard', 'Transaksi', 'Peralatan Lab',
-      'Kondisi Alat', 'Mahasiswa', 'Kategori', 'User Management'
-    ];
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
+  Widget _buildBottomNav(bool isDark) {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      onTap: (index) => setState(() => _selectedIndex = index),
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.dashboard_rounded),
+          label: 'Dashboard',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.swap_horiz_rounded),
+          label: 'Transaksi',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.science_rounded),
+          label: 'Peralatan',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.people_rounded),
+          label: 'User',
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Profile Dropdown Widget ───────────────────────────────────────────────
+class _ProfileDropdown extends StatelessWidget {
+  final bool isDark;
+  const _ProfileDropdown({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = SessionHelper.currentName;
+    final role = SessionHelper.currentRole;
+    final isAdmin = SessionHelper.isAdmin;
+
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 44),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+      onSelected: (value) => _onMenuSelected(context, value),
+      itemBuilder: (_) => [
+        // Header info user
+        PopupMenuItem<String>(
+          enabled: false,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppTheme.primary,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isAdmin ? AppTheme.primary : AppTheme.success,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(role, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, fontFamily: AppTheme.fontFamily)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        _menuItem('edit_profile', Icons.person_rounded, 'Edit Profile', isDark),
+        _menuItem('theme', Icons.dark_mode_rounded, 'Ubah Tema', isDark),
+        _menuItem('notif', Icons.notifications_rounded, 'Notifikasi', isDark),
+        _menuItem('about', Icons.info_rounded, 'Tentang App', isDark),
+        const PopupMenuDivider(),
+        _menuItem('logout', Icons.logout_rounded, 'Keluar', isDark, isDestructive: true),
+      ],
       child: Row(
         children: [
-          // Toggle sidebar button
-          GestureDetector(
-            onTap: () => setState(() => _sidebarVisible = !_sidebarVisible),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                _sidebarVisible ? Icons.menu_open_rounded : Icons.menu_rounded,
-                size: 20,
-                color: AppTheme.textPrimary,
-              ),
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppTheme.primary,
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(width: 16),
-          Text(
-            titles[_selectedIndex.clamp(0, titles.length - 1)],
-            style: const TextStyle(
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          // Profile chip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: AppTheme.primary,
-                  child: Text(
-                    SessionHelper.currentName.isNotEmpty
-                        ? SessionHelper.currentName[0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  SessionHelper.currentName,
-                  style: const TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: SessionHelper.isAdmin ? AppTheme.primary : AppTheme.success,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    SessionHelper.currentRole,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: AppTheme.fontFamily,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(width: 4),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 18,
+            color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, bool isDark, {bool isDestructive = false}) {
+    final color = isDestructive ? AppTheme.error : (isDark ? AppTheme.darkText : AppTheme.textPrimary);
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: color)),
+        ],
+      ),
+    );
+  }
+
+  void _onMenuSelected(BuildContext context, String value) {
+    switch (value) {
+      case 'edit_profile':
+      case 'theme':
+      case 'notif':
+      case 'about':
+        Navigator.pushNamed(context, Routes.settings, arguments: value);
+        break;
+      case 'logout':
+        _showLogoutDialog(context);
+        break;
+    }
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Konfirmasi Keluar', style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
+        content: const Text('Apakah kamu yakin ingin keluar?', style: TextStyle(fontFamily: AppTheme.fontFamily)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              SessionHelper.clearSession();
+              Navigator.pop(context);
+              Navigator.pushNamedAndRemoveUntil(context, Routes.splash, (r) => false);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Keluar'),
           ),
         ],
       ),

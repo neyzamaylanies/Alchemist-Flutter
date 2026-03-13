@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'utils/app_theme.dart';
+import 'utils/routes.dart';
+import 'utils/theme_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,10 +15,25 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Alchemist - Inventory Laboratorium',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'Alchemist - Inventory Laboratorium',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+
+            // Routes sesuai modul dosen
+            initialRoute: Routes.splash,
+            routes: Routes.routes,
+            onGenerateRoute: Routes.onGenerateRoute,
+    // return MaterialApp(
+    //   title: 'Alchemist - Inventory Laboratorium',
+    //   debugShowCheckedModeBanner: false,
+    //   theme: AppTheme.lightTheme,
       // theme: ThemeData(
         // This is the theme of your application.
         //
@@ -39,7 +57,12 @@ class MyApp extends StatelessWidget {
         //   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       // ),
       // ),
-      home: const SplashScreen(),
+      
+      // home: const SplashScreen(),
+
+          );
+        },
+      ),
     );
   }
 }
