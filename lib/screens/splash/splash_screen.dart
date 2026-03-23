@@ -1,8 +1,10 @@
 // lib/screens/splash/splash_screen.dart
 import 'package:flutter/material.dart';
-import '../main_layout.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/session_helper.dart';
+import '../../utils/routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,12 +27,21 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    _fadeAnim = CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeOut));
+    _fadeAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    );
     _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.elasticOut)),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
+      ),
     );
     _slideAnim = Tween<double>(begin: 30, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 0.8, curve: Curves.easeOut)),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 0.8, curve: Curves.easeOut),
+      ),
     );
     _controller.forward();
     _navigateToMain();
@@ -39,17 +50,13 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToMain() async {
     await Future.delayed(const Duration(milliseconds: 2800));
     if (!mounted) return;
-    // Set demo session langsung (tanpa login dulu)
-    SessionHelper.setDemoSession();
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MainLayout(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      Navigator.pushReplacementNamed(context, Routes.main);
+    } else {
+      Navigator.pushReplacementNamed(context, Routes.login);
+    }
   }
 
   @override
@@ -64,7 +71,6 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: AppTheme.sidebarBg,
       body: Stack(
         children: [
-          // Background subtle gradient
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
@@ -77,7 +83,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-          // Decorative circles
           Positioned(
             top: -80,
             right: -80,
@@ -102,7 +107,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-          // Content
           Center(
             child: AnimatedBuilder(
               animation: _controller,
@@ -116,14 +120,14 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Logo
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              // color: Colors.white.withValues(alpha: 0.05),
                               color: const Color(0xFF3730A3),
                               borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
                             ),
                             child: Image.asset(
                               'assets/images/logo/LogoAlchemist.png',
