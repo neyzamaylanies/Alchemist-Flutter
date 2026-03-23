@@ -1,4 +1,3 @@
-// lib/widgets/data_table_card.dart
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
@@ -8,6 +7,7 @@ class DataTableCard extends StatelessWidget {
   final bool isLoading;
   final String emptyMessage;
   final IconData emptyIcon;
+  final List<double>? columnWidths;
 
   const DataTableCard({
     super.key,
@@ -16,116 +16,248 @@ class DataTableCard extends StatelessWidget {
     this.isLoading = false,
     this.emptyMessage = 'Belum ada data',
     this.emptyIcon = Icons.inbox_rounded,
+    this.columnWidths,
   });
+
+  double _defaultWidth(String header) {
+    switch (header.toUpperCase()) {
+      case 'ID':
+        return 90;
+      case 'AKSI':
+        return 80;
+      case 'JUMLAH':
+        return 70;
+      case 'PETUGAS':
+        return 90;
+      case 'PEMINJAM':
+        return 100;
+      case 'TANGGAL':
+        return 110;
+      default:
+        return 130;
+    }
+  }
+
+  List<double> get _widths {
+    if (columnWidths != null && columnWidths!.length == headers.length) {
+      return columnWidths!;
+    }
+    return headers.map(_defaultWidth).toList();
+  }
+
+  double get _totalWidth => _widths.fold(0, (a, b) => a + b);
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
+    final headerBg = isDark ? const Color(0xFF1E1B3A) : const Color(0xFFF9F9FF);
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: borderColor),
       ),
-      // Scroll vertikal untuk seluruh tabel
       child: Column(
         children: [
-          // Header row — fixed
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9F9FF),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-            ),
-            child: Row(
-              children: headers.map((h) => Expanded(
-                child: Text(
-                  h,
-                  style: const TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.5,
+          // HEADER (desktop only)
+          if (!isMobile)
+            Container(
+              decoration: BoxDecoration(
+                color: headerBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                border: Border(bottom: BorderSide(color: borderColor)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: _totalWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: List.generate(
+                        headers.length,
+                        (i) => SizedBox(
+                          width: _widths[i],
+                          child: Text(
+                            headers[i],
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppTheme.darkTextSub
+                                  : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              )).toList(),
+              ),
             ),
-          ),
-          // Body — scrollable
+
+          // BODY
           if (isLoading)
             const Padding(
               padding: EdgeInsets.all(40),
-              child: Center(child: CircularProgressIndicator()),
+              child: CircularProgressIndicator(),
             )
           else if (rows.isEmpty)
             Padding(
               padding: const EdgeInsets.all(40),
               child: Column(
                 children: [
-                  Icon(emptyIcon, size: 48, color: AppTheme.textMuted),
+                  Icon(emptyIcon, size: 48),
                   const SizedBox(height: 12),
-                  Text(emptyMessage, style: const TextStyle(fontFamily: AppTheme.fontFamily, color: AppTheme.textSecondary)),
+                  Text(emptyMessage),
                 ],
               ),
             )
           else
-            Expanded(
-              child: ListView.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: index % 2 == 0 ? Colors.white : const Color(0xFFFAFAFF),
-                      border: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
-                    ),
-                    child: Row(
-                      children: rows[index].map((cell) => Expanded(child: cell)).toList(),
-                    ),
-                  );
-                },
-              ),
-            ),
+            isMobile
+                ? _buildMobileList(context)
+                : _buildDesktopTable(context, borderColor, isDark),
         ],
       ),
     );
   }
-}
 
-// StatusBadge — fit ke konten, tidak melebar
-class StatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const StatusBadge({super.key, required this.label, required this.color});
+  // ================= MOBILE =================
+  Widget _buildMobileList(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  @override
-  Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            fontFamily: AppTheme.fontFamily,
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: rows.length,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1730) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(headers.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 90,
+                      child: Text(
+                        headers[i],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: rows[index][i]),
+                  ],
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+
+  // ================= DESKTOP =================
+  Widget _buildDesktopTable(
+    BuildContext context,
+    Color borderColor,
+    bool isDark,
+  ) {
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: _totalWidth,
+          child: Column(
+            children: List.generate(rows.length, (index) {
+              final isEven = index % 2 == 0;
+              final rowBg = isDark
+                  ? (isEven ? AppTheme.darkSurface : const Color(0xFF1A1730))
+                  : (isEven ? Colors.white : const Color(0xFFFAFAFF));
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: rowBg,
+                  border: Border(
+                    bottom: BorderSide(color: borderColor, width: 0.5),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: List.generate(
+                      rows[index].length,
+                      (i) => SizedBox(
+                        width: i < _widths.length ? _widths[i] : 130,
+                        child: rows[index][i],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
       ),
     );
   }
+} // ✅ INI PENUTUP DataTableCard
+
+// ================= BADGE =================
+class StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const StatusBadge({super.key, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 }
 
+// ================= BUTTON =================
 class ActionButton extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -144,8 +276,9 @@ class ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
