@@ -3,23 +3,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/equipment/equipment_list_bloc.dart';
 import '../../models/ui/equipment.dart';
+import '../../repositories/equipment_repository.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/routes.dart';
+import '../../utils/remote_helper.dart';
 import '../../widgets/data_table_card.dart';
 import '../condition_log/condition_log_list_page.dart';
 import '../category/category_list_page.dart';
 import 'equipment_detail_page.dart';
 
 class EquipmentListPage extends StatefulWidget {
-  final EquipmentListBloc equipmentBloc;
-  const EquipmentListPage({super.key, required this.equipmentBloc});
+  const EquipmentListPage({super.key});
 
   @override
   State<EquipmentListPage> createState() => _EquipmentListPageState();
 }
 
 class _EquipmentListPageState extends State<EquipmentListPage> {
+  late final EquipmentListBloc _bloc;
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _bloc = EquipmentListBloc(
+      equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
+    )..add(LoadEquipmentListEvent());
+  }
+
+  @override
+  void dispose() {
+    _bloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +44,13 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
     final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
 
     return BlocProvider.value(
-      value: widget.equipmentBloc,
+      value: _bloc,
       child: Scaffold(
         backgroundColor: bgColor,
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header + search + action buttons
+            // ── Header + search + sub-nav buttons
             Container(
               color: isDark ? AppTheme.darkSurface : AppTheme.surface,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -45,56 +60,79 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text('Peralatan Lab', style: TextStyle(
-                          fontFamily: AppTheme.fontFamily, fontSize: 18,
-                          fontWeight: FontWeight.w700, color: textColor)),
+                        child: Text(
+                          'Peralatan Lab',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: textColor,
+                          ),
+                        ),
                       ),
                       ElevatedButton.icon(
                         onPressed: () => _onCreateClick(context),
                         icon: const Icon(Icons.add_rounded, size: 16),
                         label: const Text('Tambah'),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  // Search bar
                   TextField(
-                    onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
-                    style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-                      color: textColor),
-                    decoration: InputDecoration(
+                    onChanged: (q) =>
+                        setState(() => _searchQuery = q.toLowerCase()),
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      color: textColor,
+                    ),
+                    decoration: const InputDecoration(
                       hintText: 'Cari peralatan...',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                      constraints: const BoxConstraints(maxHeight: 42),
+                      prefixIcon: Icon(Icons.search_rounded, size: 18),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 0,
+                      ),
+                      constraints: BoxConstraints(maxHeight: 42),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Sub-navigasi
                   Row(
                     children: [
                       _SubNavButton(
                         icon: Icons.assignment_rounded,
                         label: 'Kondisi Log',
-                        onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const ConditionLogListPage())),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ConditionLogListPage(),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       _SubNavButton(
                         icon: Icons.category_rounded,
                         label: 'Kategori',
-                        onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const CategoryListPage())),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CategoryListPage(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            // Tabel
+
+            // ── Tabel
             Expanded(
               child: BlocBuilder<EquipmentListBloc, EquipmentListState>(
                 builder: (context, state) {
@@ -103,40 +141,125 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
                   List<dynamic> categories = [];
 
                   if (state is EquipmentListLoaded) {
-                    equipments = state.equipments.where((e) =>
-                      e.equipmentName.toLowerCase().contains(_searchQuery) ||
-                      e.id.toLowerCase().contains(_searchQuery) ||
-                      e.location.toLowerCase().contains(_searchQuery)
-                    ).toList();
+                    equipments = state.equipments
+                        .where(
+                          (e) =>
+                              e.equipmentName.toLowerCase().contains(
+                                _searchQuery,
+                              ) ||
+                              e.id.toLowerCase().contains(_searchQuery) ||
+                              e.location.toLowerCase().contains(_searchQuery),
+                        )
+                        .toList();
                     categories = state.categories;
                   }
 
-                  return DataTableCard(
-                    isLoading: isLoading,
-                    emptyMessage: 'Belum ada data peralatan',
-                    emptyIcon: Icons.science_rounded,
-                    headers: const ['ID', 'NAMA', 'KATEGORI', 'TERSEDIA', 'TOTAL', 'STATUS', 'LOKASI', 'AKSI'],
-                    rows: equipments.map((eq) {
-                      final color = AppTheme.getKondisiColor(eq.conditionStatus);
-                      String catName = eq.categoryId;
-                      try {
-                        catName = categories.firstWhere((c) => c.id == eq.categoryId)?.categoryName ?? eq.categoryId;
-                      } catch (_) {}
-                      return [
-                        Text(eq.id, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
-                        Text(eq.equipmentName, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
-                        Text(catName, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
-                        Text('${eq.availableQuantity}', style: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.success)),
-                        Text('${eq.totalQuantity}', style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor)),
-                        StatusBadge(label: AppTheme.getKondisiLabel(eq.conditionStatus), color: color),
-                        Text(eq.location, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
-                        Row(children: [
-                          ActionButton(icon: Icons.edit_rounded, color: AppTheme.primary, tooltip: 'Edit', onTap: () => _onEditClick(context, eq)),
-                          const SizedBox(width: 6),
-                          ActionButton(icon: Icons.delete_rounded, color: AppTheme.error, tooltip: 'Hapus', onTap: () => _onDeleteClick(context, eq)),
-                        ]),
-                      ];
-                    }).toList(),
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: DataTableCard(
+                      isLoading: isLoading,
+                      emptyMessage: 'Belum ada data peralatan',
+                      emptyIcon: Icons.science_rounded,
+                      headers: const [
+                        'ID',
+                        'NAMA',
+                        'KATEGORI',
+                        'TERSEDIA',
+                        'TOTAL',
+                        'STATUS',
+                        'LOKASI',
+                        'AKSI',
+                      ],
+                      rows: equipments.map((eq) {
+                        final color = AppTheme.getKondisiColor(
+                          eq.conditionStatus,
+                        );
+                        String catName = eq.categoryId;
+                        try {
+                          catName =
+                              categories
+                                  .firstWhere((c) => c.id == eq.categoryId)
+                                  ?.categoryName ??
+                              eq.categoryId;
+                        } catch (_) {}
+
+                        return [
+                          Text(
+                            eq.id,
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 12,
+                              color: subColor,
+                            ),
+                          ),
+                          Text(
+                            eq.equipmentName,
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            catName,
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 12,
+                              color: subColor,
+                            ),
+                          ),
+                          Text(
+                            '${eq.availableQuantity}',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.success,
+                            ),
+                          ),
+                          Text(
+                            '${eq.totalQuantity}',
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 13,
+                              color: textColor,
+                            ),
+                          ),
+                          StatusBadge(
+                            label: AppTheme.getKondisiLabel(eq.conditionStatus),
+                            color: color,
+                          ),
+                          Text(
+                            eq.location,
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 12,
+                              color: subColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              ActionButton(
+                                icon: Icons.edit_rounded,
+                                color: AppTheme.primary,
+                                tooltip: 'Edit',
+                                onTap: () => _onEditClick(context, eq),
+                              ),
+                              const SizedBox(width: 6),
+                              ActionButton(
+                                icon: Icons.delete_rounded,
+                                color: AppTheme.error,
+                                tooltip: 'Hapus',
+                                onTap: () => _onDeleteClick(context, eq),
+                              ),
+                            ],
+                          ),
+                        ];
+                      }).toList(),
+                    ),
                   );
                 },
               ),
@@ -148,20 +271,26 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
   }
 
   void _onCreateClick(BuildContext context) async {
-    var result = await Navigator.push(context,
-      MaterialPageRoute(builder: (_) => const EquipmentDetailPage(equipment: null)));
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EquipmentDetailPage(equipment: null),
+      ),
+    );
     if (result is EquipmentCreatedResult) {
-      widget.equipmentBloc.add(AddNewEquipmentEvent(newEquipment: result.equipment));
+      _bloc.add(AddNewEquipmentEvent(newEquipment: result.equipment));
     }
   }
 
   void _onEditClick(BuildContext context, Equipment eq) async {
-    var result = await Navigator.push(context,
-      MaterialPageRoute(builder: (_) => EquipmentDetailPage(equipment: eq)));
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EquipmentDetailPage(equipment: eq)),
+    );
     if (result is EquipmentUpdatedResult) {
-      widget.equipmentBloc.add(UpdateEquipmentEvent(updatedEquipment: result.equipment));
+      _bloc.add(UpdateEquipmentEvent(updatedEquipment: result.equipment));
     } else if (result is EquipmentDeletedResult) {
-      widget.equipmentBloc.add(DeleteEquipmentEvent(deletedEquipment: result.equipment));
+      _bloc.add(DeleteEquipmentEvent(deletedEquipment: result.equipment));
     }
   }
 
@@ -170,12 +299,27 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Alat', style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-        content: Text('Hapus "${eq.equipmentName}"?', style: const TextStyle(fontFamily: AppTheme.fontFamily)),
+        title: const Text(
+          'Hapus Alat',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Hapus "${eq.equipmentName}"?',
+          style: const TextStyle(fontFamily: AppTheme.fontFamily),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
-            onPressed: () { Navigator.pop(context); _onEditClick(context, eq); },
+            onPressed: () {
+              Navigator.pop(context);
+              _onEditClick(context, eq);
+            },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Hapus'),
           ),
@@ -189,7 +333,11 @@ class _SubNavButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _SubNavButton({required this.icon, required this.label, required this.onTap});
+  const _SubNavButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +348,9 @@ class _SubNavButton extends StatelessWidget {
       label: Text(label, style: const TextStyle(fontSize: 12)),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        side: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFDDD8FF)),
+        side: BorderSide(
+          color: isDark ? AppTheme.darkBorder : const Color(0xFFDDD8FF),
+        ),
         foregroundColor: isDark ? AppTheme.primaryLighter : AppTheme.primary,
       ),
     );

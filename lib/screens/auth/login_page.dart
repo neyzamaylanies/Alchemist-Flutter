@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_event.dart';
 import '../../blocs/auth/auth_state.dart';
@@ -32,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
-          Navigator.pushReplacementNamed(context, Routes.main);
+          context.go('/dashboard');
         }
         if (state is AuthError) {
           ScaffoldMessenger.of(context).showSnackBar(

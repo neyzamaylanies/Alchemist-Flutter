@@ -1,47 +1,60 @@
 // lib/screens/main_layout.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+// Import Auth untuk Logout
+import '../blocs/auth/auth_bloc.dart';
+import '../blocs/auth/auth_event.dart';
+
+// Import BLoC sesuai aslinya
 import '../blocs/equipment/equipment_list_bloc.dart';
 import '../blocs/transaction/transaction_list_bloc.dart';
 import '../blocs/student/student_list_bloc.dart';
+
+// Import Repositories
 import '../repositories/equipment_repository.dart';
 import '../repositories/transaction_repository.dart';
 import '../repositories/student_repository.dart';
+
+// Import Utils
 import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
-import '../utils/routes.dart';
 import '../utils/session_helper.dart';
-import 'home/home_page.dart';
-import 'equipment/equipment_list_page.dart';
-import 'transaction/transaction_list_page.dart';
-import 'user/user_tab_page.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  // Ini jembatan dari routes.dart ke UI lu
+  final StatefulNavigationShell navigationShell;
+
+  const MainLayout({super.key, required this.navigationShell});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  int _selectedIndex = 0;
-
-  final EquipmentListBloc _equipmentBloc = EquipmentListBloc(
-    equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
-  );
-  final TransactionListBloc _transactionBloc = TransactionListBloc(
-    transactionRepository: TransactionRepository(RemoteHelper.getDio()),
-  );
-  final StudentListBloc _studentBloc = StudentListBloc(
-    studentRepository: StudentRepository(RemoteHelper.getDio()),
-  );
+  // Inisialisasi BLoC seperti di file original lu
+  late final EquipmentListBloc _equipmentBloc;
+  late final TransactionListBloc _transactionBloc;
+  late final StudentListBloc _studentBloc;
 
   @override
   void initState() {
     super.initState();
-    _equipmentBloc.add(LoadEquipmentListEvent());
-    _transactionBloc.add(LoadTransactionListEvent());
-    _studentBloc.add(LoadStudentListEvent());
+    _equipmentBloc = EquipmentListBloc(
+      equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
+    );
+    _transactionBloc = TransactionListBloc(
+      transactionRepository: TransactionRepository(RemoteHelper.getDio()),
+    );
+    _studentBloc = StudentListBloc(
+      studentRepository: StudentRepository(RemoteHelper.getDio()),
+    );
+
+    // Buka komentar ini kalau Event-nya udah lu atur di BLoC lu
+    // _equipmentBloc.add(LoadEquipmentListEvent());
+    // _transactionBloc.add(LoadTransactionListEvent());
+    // _studentBloc.add(LoadStudentListEvent());
   }
 
   @override
@@ -52,35 +65,11 @@ class _MainLayoutState extends State<MainLayout> {
     super.dispose();
   }
 
-  Widget _buildPage() {
-    switch (_selectedIndex) {
-      case 0:
-        return HomePage(
-          equipmentBloc: _equipmentBloc,
-          transactionBloc: _transactionBloc,
-          studentBloc: _studentBloc,
-          onNavigate: (index) => setState(() => _selectedIndex = index),
-        );
-      case 1:
-        return TransactionListPage(transactionBloc: _transactionBloc);
-      case 2:
-        return EquipmentListPage(equipmentBloc: _equipmentBloc);
-      case 3:
-        return UserTabPage(studentBloc: _studentBloc);
-      default:
-        return HomePage(
-          equipmentBloc: _equipmentBloc,
-          transactionBloc: _transactionBloc,
-          studentBloc: _studentBloc,
-          onNavigate: (index) => setState(() => _selectedIndex = index),
-        );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Bungkus dengan MultiBlocProvider biar semua Tab kebagian data
     return MultiBlocProvider(
       providers: [
         BlocProvider<EquipmentListBloc>.value(value: _equipmentBloc),
@@ -89,7 +78,8 @@ class _MainLayoutState extends State<MainLayout> {
       ],
       child: Scaffold(
         appBar: _buildAppBar(context, isDark),
-        body: _buildPage(),
+        // BODY-nya sekarang dikendalikan penuh oleh go_router
+        body: widget.navigationShell,
         bottomNavigationBar: _buildBottomNav(isDark),
       ),
     );
@@ -144,22 +134,24 @@ class _MainLayoutState extends State<MainLayout> {
                   ),
                 ),
                 const SizedBox(width: 12),
+
                 // Search bar
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      Routes.search,
-                      arguments: '',
-                    ),
+                    onTap: () =>
+                        context.push('/search'), // Migrasi ke go_router
                     child: Container(
                       height: 38,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+                        color: isDark
+                            ? AppTheme.darkSurfaceVar
+                            : AppTheme.background,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+                          color: isDark
+                              ? AppTheme.darkBorder
+                              : const Color(0xFFE5E7EB),
                         ),
                       ),
                       child: Row(
@@ -167,7 +159,9 @@ class _MainLayoutState extends State<MainLayout> {
                           Icon(
                             Icons.search_rounded,
                             size: 16,
-                            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+                            color: isDark
+                                ? AppTheme.darkTextSub
+                                : AppTheme.textMuted,
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -175,7 +169,9 @@ class _MainLayoutState extends State<MainLayout> {
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 12,
-                              color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+                              color: isDark
+                                  ? AppTheme.darkTextSub
+                                  : AppTheme.textMuted,
                             ),
                           ),
                         ],
@@ -184,6 +180,7 @@ class _MainLayoutState extends State<MainLayout> {
                   ),
                 ),
                 const SizedBox(width: 12),
+
                 // Profile avatar + dropdown
                 _ProfileDropdown(isDark: isDark),
               ],
@@ -196,8 +193,18 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _buildBottomNav(bool isDark) {
     return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
+      // Ambil index tab dari go_router
+      currentIndex: widget.navigationShell.currentIndex,
+      onTap: (index) {
+        // Pindah tab menggunakan go_router
+        widget.navigationShell.goBranch(
+          index,
+          initialLocation: index == widget.navigationShell.currentIndex,
+        );
+      },
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: AppTheme.primary,
+      unselectedItemColor: isDark ? Colors.grey.shade400 : Colors.grey,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_rounded),
@@ -248,22 +255,45 @@ class _ProfileDropdown extends StatelessWidget {
                 backgroundColor: AppTheme.primary,
                 child: Text(
                   name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+                    ),
+                  ),
                   Container(
                     margin: const EdgeInsets.only(top: 2),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: isAdmin ? AppTheme.primary : AppTheme.success,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(role, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, fontFamily: AppTheme.fontFamily)),
+                    child: Text(
+                      role,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: AppTheme.fontFamily,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -276,7 +306,13 @@ class _ProfileDropdown extends StatelessWidget {
         _menuItem('notif', Icons.notifications_rounded, 'Notifikasi', isDark),
         _menuItem('about', Icons.info_rounded, 'Tentang App', isDark),
         const PopupMenuDivider(),
-        _menuItem('logout', Icons.logout_rounded, 'Keluar', isDark, isDestructive: true),
+        _menuItem(
+          'logout',
+          Icons.logout_rounded,
+          'Keluar',
+          isDark,
+          isDestructive: true,
+        ),
       ],
       child: Row(
         children: [
@@ -285,26 +321,48 @@ class _ProfileDropdown extends StatelessWidget {
             backgroundColor: AppTheme.primary,
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : 'U',
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down_rounded, size: 18,
-            color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary,
+          ),
         ],
       ),
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, bool isDark, {bool isDestructive = false}) {
-    final color = isDestructive ? AppTheme.error : (isDark ? AppTheme.darkText : AppTheme.textPrimary);
+  PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label,
+    bool isDark, {
+    bool isDestructive = false,
+  }) {
+    final color = isDestructive
+        ? AppTheme.error
+        : (isDark ? AppTheme.darkText : AppTheme.textPrimary);
     return PopupMenuItem<String>(
       value: value,
       child: Row(
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -316,7 +374,7 @@ class _ProfileDropdown extends StatelessWidget {
       case 'theme':
       case 'notif':
       case 'about':
-        Navigator.pushNamed(context, Routes.settings, arguments: value);
+        context.push('/settings'); // Migrasi ke go_router
         break;
       case 'logout':
         _showLogoutDialog(context);
@@ -329,15 +387,30 @@ class _ProfileDropdown extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Keluar', style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-        content: const Text('Apakah kamu yakin ingin keluar?', style: TextStyle(fontFamily: AppTheme.fontFamily)),
+        title: const Text(
+          'Konfirmasi Keluar',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: const Text(
+          'Apakah kamu yakin ingin keluar?',
+          style: TextStyle(fontFamily: AppTheme.fontFamily),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             onPressed: () {
               SessionHelper.clearSession();
-              Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(context, Routes.splash, (r) => false);
+              Navigator.pop(context); // Tutup dialog popup
+              context.read<AuthBloc>().add(
+                LogoutRequested(),
+              ); // Tembak event logout
+              context.go('/login'); // Lempar ke halaman login pakai go_router
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Keluar'),

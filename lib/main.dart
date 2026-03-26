@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'blocs/auth/auth_bloc.dart';
 import 'blocs/auth/auth_event.dart';
@@ -12,7 +11,6 @@ import 'utils/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
   runApp(const MyApp());
 }
 
@@ -29,7 +27,7 @@ class MyApp extends StatelessWidget {
               ..add(AuthCheckRequested()),
         child: Consumer<ThemeProvider>(
           builder: (context, themeProvider, _) {
-            return MaterialApp(
+            return MaterialApp.router(
               title: 'Alchemist - Inventory Laboratorium',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,
@@ -37,9 +35,7 @@ class MyApp extends StatelessWidget {
               themeMode: themeProvider.isDarkMode
                   ? ThemeMode.dark
                   : ThemeMode.light,
-              initialRoute: Routes.splash,
-              routes: Routes.routes,
-              onGenerateRoute: Routes.onGenerateRoute,
+              routerConfig: AppRouter.router,
             );
           },
         ),
