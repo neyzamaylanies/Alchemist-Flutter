@@ -26,6 +26,27 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
+  void _onTabTapped(int index) {
+    setState(() => _selectedIndex = index);
+    // Reload API setiap pindah tab supaya data selalu fresh
+    switch (index) {
+      case 0:
+        _equipmentBloc.add(LoadEquipmentListEvent());
+        _transactionBloc.add(LoadTransactionListEvent());
+        _studentBloc.add(LoadStudentListEvent());
+        break;
+      case 1:
+        _transactionBloc.add(LoadTransactionListEvent());
+        break;
+      case 2:
+        _equipmentBloc.add(LoadEquipmentListEvent());
+        break;
+      case 3:
+        _studentBloc.add(LoadStudentListEvent());
+        break;
+    }
+  }
+
   final EquipmentListBloc _equipmentBloc = EquipmentListBloc(
     equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
   );
@@ -59,7 +80,7 @@ class _MainLayoutState extends State<MainLayout> {
           equipmentBloc: _equipmentBloc,
           transactionBloc: _transactionBloc,
           studentBloc: _studentBloc,
-          onNavigate: (index) => setState(() => _selectedIndex = index),
+          onNavigate: _onTabTapped,
         );
       case 1:
         return TransactionListPage(transactionBloc: _transactionBloc);
@@ -72,7 +93,7 @@ class _MainLayoutState extends State<MainLayout> {
           equipmentBloc: _equipmentBloc,
           transactionBloc: _transactionBloc,
           studentBloc: _studentBloc,
-          onNavigate: (index) => setState(() => _selectedIndex = index),
+          onNavigate: _onTabTapped,
         );
     }
   }
@@ -96,11 +117,12 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     final bgColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
 
     return PreferredSize(
-      preferredSize: const Size.fromHeight(64),
+      preferredSize: Size.fromHeight(isMobile ? 56 : 64),
       child: Container(
         decoration: BoxDecoration(
           color: bgColor,
@@ -116,13 +138,13 @@ class _MainLayoutState extends State<MainLayout> {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 8),
             child: Row(
               children: [
-                // Logo + Nama App
+                // Logo
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -133,49 +155,45 @@ class _MainLayoutState extends State<MainLayout> {
                     fit: BoxFit.fill,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  'Alchemist',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+                const SizedBox(width: 8),
+                if (!isMobile) ...[
+                  Text(
+                    'Alchemist',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Search bar
+                  const SizedBox(width: 12),
+                ],
+                // Search bar — lebih kecil di mobile
                 Expanded(
                   child: GestureDetector(
                     onTap: () => Navigator.pushNamed(
-                      context,
-                      Routes.search,
-                      arguments: '',
-                    ),
+                      context, Routes.search, arguments: ''),
                     child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
                         color: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
-                        ),
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.search_rounded,
-                            size: 16,
-                            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Cari peralatan, mahasiswa...',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 12,
-                              color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+                          Icon(Icons.search_rounded, size: 15,
+                            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              isMobile ? 'Cari...' : 'Cari peralatan, mahasiswa...',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily, fontSize: 12,
+                                color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted),
                             ),
                           ),
                         ],
@@ -183,9 +201,8 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Profile avatar + dropdown
-                _ProfileDropdown(isDark: isDark),
+                const SizedBox(width: 10),
+                _ProfileDropdown(isDark: isDark, showName: !isMobile),
               ],
             ),
           ),
@@ -197,39 +214,36 @@ class _MainLayoutState extends State<MainLayout> {
   Widget _buildBottomNav(bool isDark) {
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
+      onTap: _onTabTapped,
+      backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surface,
+      selectedItemColor: AppTheme.primary,
+      unselectedItemColor: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
+      selectedLabelStyle: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 11),
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
       items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard_rounded),
-          label: 'Dashboard',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.swap_horiz_rounded),
-          label: 'Transaksi',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.science_rounded),
-          label: 'Peralatan',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.people_rounded),
-          label: 'User',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+        BottomNavigationBarItem(icon: Icon(Icons.swap_horiz_rounded), label: 'Transaksi'),
+        BottomNavigationBarItem(icon: Icon(Icons.science_rounded), label: 'Peralatan'),
+        BottomNavigationBarItem(icon: Icon(Icons.people_rounded), label: 'User'),
       ],
     );
   }
 }
 
-// ─── Profile Dropdown Widget ───────────────────────────────────────────────
+// ─── Profile Dropdown ──────────────────────────────────────────────────────
 class _ProfileDropdown extends StatelessWidget {
   final bool isDark;
-  const _ProfileDropdown({required this.isDark});
+  final bool showName;
+  const _ProfileDropdown({required this.isDark, this.showName = true});
 
   @override
   Widget build(BuildContext context) {
     final name = SessionHelper.currentName;
     final role = SessionHelper.currentRole;
     final isAdmin = SessionHelper.isAdmin;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
     return PopupMenuButton<String>(
       offset: const Offset(0, 44),
@@ -237,38 +251,33 @@ class _ProfileDropdown extends StatelessWidget {
       color: isDark ? AppTheme.darkSurface : AppTheme.surface,
       onSelected: (value) => _onMenuSelected(context, value),
       itemBuilder: (_) => [
-        // Header info user
         PopupMenuItem<String>(
           enabled: false,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppTheme.primary,
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          child: Row(children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.primary,
+              child: Text(initial,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, style: TextStyle(fontFamily: AppTheme.fontFamily,
+                fontWeight: FontWeight.w600, fontSize: 14,
+                color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isAdmin ? AppTheme.primary : AppTheme.success,
+                  borderRadius: BorderRadius.circular(4),
                 ),
+                child: Text(role, style: const TextStyle(color: Colors.white,
+                  fontSize: 10, fontWeight: FontWeight.w600, fontFamily: AppTheme.fontFamily)),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isAdmin ? AppTheme.primary : AppTheme.success,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(role, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, fontFamily: AppTheme.fontFamily)),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ]),
+          ]),
         ),
         const PopupMenuDivider(),
         _menuItem('edit_profile', Icons.person_rounded, 'Edit Profile', isDark),
@@ -279,34 +288,43 @@ class _ProfileDropdown extends StatelessWidget {
         _menuItem('logout', Icons.logout_rounded, 'Keluar', isDark, isDestructive: true),
       ],
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
-            radius: 18,
+            radius: 16,
             backgroundColor: AppTheme.primary,
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-            ),
+            child: Text(initial,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down_rounded, size: 18,
+          if (showName) ...[
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 100),
+              child: Text(name,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+            ),
+          ],
+          const SizedBox(width: 2),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 16,
             color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
         ],
       ),
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, bool isDark, {bool isDestructive = false}) {
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, bool isDark,
+      {bool isDestructive = false}) {
     final color = isDestructive ? AppTheme.error : (isDark ? AppTheme.darkText : AppTheme.textPrimary);
     return PopupMenuItem<String>(
       value: value,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 12),
-          Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: color)),
-        ],
-      ),
+      child: Row(children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: color)),
+      ]),
     );
   }
 
@@ -329,8 +347,10 @@ class _ProfileDropdown extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Keluar', style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-        content: const Text('Apakah kamu yakin ingin keluar?', style: TextStyle(fontFamily: AppTheme.fontFamily)),
+        title: const Text('Konfirmasi Keluar',
+          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
+        content: const Text('Apakah kamu yakin ingin keluar?',
+          style: TextStyle(fontFamily: AppTheme.fontFamily)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
@@ -339,7 +359,7 @@ class _ProfileDropdown extends StatelessWidget {
               Navigator.pop(context);
               Navigator.pushNamedAndRemoveUntil(context, Routes.splash, (r) => false);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
             child: const Text('Keluar'),
           ),
         ],

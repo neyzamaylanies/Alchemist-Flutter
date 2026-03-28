@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/splash/splash_screen.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'utils/app_theme.dart';
 import 'utils/routes.dart';
 import 'utils/theme_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id', null);
   runApp(const MyApp());
 }
 
