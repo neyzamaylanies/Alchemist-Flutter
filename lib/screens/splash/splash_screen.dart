@@ -1,11 +1,11 @@
-// lib/screens/splash/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_event.dart';
 import '../../blocs/auth/auth_state.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,48 +21,67 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnim;
   late Animation<double> _slideAnim;
 
-  // Flag untuk memastikan durasi minimal splash screen terpenuhi
   bool _isMinSplashDurationPassed = false;
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
+
     _fadeAnim = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     );
+
     _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
       ),
     );
+
     _slideAnim = Tween<double>(begin: 30, end: 0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.3, 0.8, curve: Curves.easeOut),
       ),
     );
+
     _controller.forward();
+
+    context.read<AuthBloc>().add(AuthCheckRequested());
+
     _startSplashTimer();
   }
 
   void _startSplashTimer() async {
-    // Tunggu animasi selama 2800ms
     await Future.delayed(const Duration(milliseconds: 2800));
+
     if (!mounted) return;
 
     _isMinSplashDurationPassed = true;
 
-    // Setelah waktu habis, cek state saat ini
-    _checkAndNavigate(context.read<AuthBloc>().state);
+    // 🔥 fallback: kalau bloc ga respon, tetap lanjut
+    _navigateFallback();
   }
 
-  void _checkAndNavigate(AuthState state) {
+  void _navigateFallback() {
+    if (!mounted) return;
+
+    final state = context.read<AuthBloc>().state;
+
+    if (state is AuthAuthenticated) {
+      context.go('/dashboard');
+    } else {
+      context.go('/login');
+    }
+  }
+
+  void _handleState(AuthState state) {
     if (!_isMinSplashDurationPassed) return;
     if (!mounted) return;
 
@@ -81,10 +100,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Bungkus dengan BlocListener agar mendeteksi jika pengecekan token telat/lambat (seperti saat F5/reload di Web)
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        _checkAndNavigate(state);
+        _handleState(state);
       },
       child: Scaffold(
         backgroundColor: AppTheme.sidebarBg,
@@ -144,45 +162,37 @@ class _SplashScreenState extends State<SplashScreen>
                               decoration: BoxDecoration(
                                 color: const Color(0xFF3730A3),
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                ),
                               ),
                               child: Image.asset(
                                 'assets/images/logo/LogoAlchemist.png',
                                 width: 120,
                                 height: 120,
-                                fit: BoxFit.fill,
                               ),
                             ),
                             const SizedBox(height: 28),
                             const Text(
                               'Alchemist',
                               style: TextStyle(
-                                fontFamily: AppTheme.fontFamily,
                                 fontSize: 36,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
-                                letterSpacing: 0.5,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
+                            const Text(
                               'Sistem Manajemen Inventory Laboratorium',
                               style: TextStyle(
-                                fontFamily: AppTheme.fontFamily,
                                 fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.5),
-                                letterSpacing: 0.3,
+                                color: Colors.white70,
                               ),
                             ),
                             const SizedBox(height: 60),
-                            SizedBox(
+                            const SizedBox(
                               width: 36,
                               height: 36,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: AppTheme.primary.withValues(alpha: 0.8),
+                                color: Colors.white70,
                               ),
                             ),
                           ],

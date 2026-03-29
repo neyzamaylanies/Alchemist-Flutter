@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-// Import Screens
+// Screens
 import '../screens/auth/login_page.dart';
 import '../screens/main_layout.dart';
 import '../screens/splash/splash_screen.dart';
@@ -20,7 +20,7 @@ import '../screens/condition_log/condition_log_list_page.dart';
 import '../screens/user/user_list_page.dart';
 import '../screens/user/user_tab_page.dart';
 
-// Import Models
+// Models
 import '../models/ui/equipment.dart';
 import '../models/ui/transaction.dart';
 import '../models/ui/student.dart';
@@ -32,15 +32,16 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
+
     routes: [
-      // --- RUTE AWAL ---
+      // 🔹 AUTH & SPLASH
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
 
-      // --- BOTTOM NAVIGATION (StatefulShellRoute) ---
+      // 🔹 MAIN (BOTTOM NAV)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainLayout(navigationShell: navigationShell),
@@ -80,7 +81,7 @@ class AppRouter {
         ],
       ),
 
-      // --- RUTE STANDALONE ---
+      // 🔹 OTHER PAGES
       GoRoute(
         path: '/search',
         builder: (context, state) => const SearchResultPage(),
@@ -106,7 +107,7 @@ class AppRouter {
         builder: (context, state) => const StudentListPage(),
       ),
 
-      // --- RUTE DETAIL ---
+      // 🔹 DETAIL
       GoRoute(
         path: '/detail/equipment',
         builder: (context, state) =>

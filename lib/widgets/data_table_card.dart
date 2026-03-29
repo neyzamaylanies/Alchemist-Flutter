@@ -5,13 +5,9 @@ import '../utils/app_theme.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // DataTableCard — Responsive table widget
 //
-// • Desktop (≥600px): header + body dalam SATU SingleChildScrollView horizontal
-//   → header & baris SELALU sinkron saat scroll.
-//   → Kolom melar mengisi lebar layar kalau total kolom < lebar layar.
-//   → Scroll horizontal muncul otomatis kalau total kolom > lebar layar.
-//
-// • Mobile (<600px): card list vertikal dengan label-value rows.
-//   → Tidak ada overflow sama sekali karena Expanded menyerap sisa lebar.
+// • Desktop (≥900px): tabel penuh dengan kolom stretch
+// • Tablet (600–899px): tabel dengan scroll horizontal kalau perlu
+// • Mobile (<600px): card list vertikal dengan label-value rows
 // ─────────────────────────────────────────────────────────────────────────────
 class DataTableCard extends StatelessWidget {
   final List<String> headers;
@@ -73,7 +69,7 @@ class DataTableCard extends StatelessWidget {
       case 'LOG ID':
         return 140;
       case 'ALAT':
-        return 110;
+        return 150;
       case 'SEBELUM':
       case 'SESUDAH':
         return 120;
@@ -100,14 +96,13 @@ class DataTableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Pakai lebar actual widget, bukan lebar layar
         final availableWidth = constraints.maxWidth;
+        // Mobile: <600, Tablet: 600–899, Desktop: ≥900
         final isMobile = availableWidth < 600;
 
         return Container(
@@ -203,6 +198,13 @@ class DataTableCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(headers.length, (i) {
+              // Sembunyikan kolom AKSI di mobile, tampilkan sebagai baris full-width
+              if (headers[i].toUpperCase() == 'AKSI') {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(children: [Expanded(child: rows[index][i])]),
+                );
+              }
               return Padding(
                 padding: EdgeInsets.only(
                   bottom: i < headers.length - 1 ? 8 : 0,
@@ -224,7 +226,6 @@ class DataTableCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Expanded mencegah overflow ke kanan
                     Expanded(child: rows[index][i]),
                   ],
                 ),
@@ -236,9 +237,15 @@ class DataTableCard extends StatelessWidget {
     );
   }
 
-  // ── Desktop table ────────────────────────────────────────────────────────
-  // Header dan body berada di dalam SATU SingleChildScrollView horizontal
-  // sehingga selalu sinkron dan header tidak "terpisah" dari body.
+  // ── Desktop / Tablet table ───────────────────────────────────────────────
+  // Strategi:
+  // 1. Hitung total lebar minimum dari semua kolom
+  // 2. Kalau muat (available >= minTotal) → stretch kolom secara proporsional
+  //    supaya mengisi lebar penuh, TANPA scroll horizontal
+  // 3. Kalau tidak muat → pakai lebar asli + scroll horizontal
+  //    PENTING: SizedBox diberi lebar = minTotalWidth secara eksplisit
+  //    supaya konten tidak "bocor" keluar viewport dan memunculkan
+  //    police-line watermark dari Flutter web renderer
   Widget _buildDesktopTable(
     bool isDark,
     Color borderColor,
@@ -249,102 +256,103 @@ class DataTableCard extends StatelessWidget {
         ? AppTheme.darkTextSub
         : AppTheme.textSecondary;
 
-    // screenWidth di sini sudah merupakan lebar actual widget (dari LayoutBuilder),
-    // bukan lebar layar. Kurangi 2px untuk border kiri+kanan.
+    // Sedikit buffer (1px per sisi border) supaya tidak pas-pasan
     final available = screenWidth - 2;
-    final needsStretch = available > _minTotalWidth;
+    final minTotal = _minTotalWidth;
+    final needsScroll = minTotal > available;
 
     final List<double> computedWidths;
-    if (needsStretch) {
-      final extra = available - _minTotalWidth;
+    if (!needsScroll) {
+      // Stretch: bagi sisa ruang merata ke semua kolom
+      final extra = available - minTotal;
       final perCol = extra / headers.length;
       computedWidths = _baseWidths.map((w) => w + perCol).toList();
     } else {
-      computedWidths = _baseWidths;
+      computedWidths = List.of(_baseWidths);
     }
 
-    final tableWidth = needsStretch ? available : _minTotalWidth;
+    // Lebar total yang dipakai untuk SizedBox
+    final tableWidth = needsScroll ? minTotal : available;
 
-    return Scrollbar(
-      thumbVisibility:
-          !needsStretch, // scrollbar hanya tampil kalau perlu scroll
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: needsStretch
-            ? const NeverScrollableScrollPhysics()
-            : const BouncingScrollPhysics(),
-        child: SizedBox(
-          width: tableWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                color: headerBg,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 11,
-                ),
-                child: Row(
-                  children: List.generate(
-                    headers.length,
-                    (i) => SizedBox(
-                      width: computedWidths[i],
-                      child: Text(
-                        headers[i],
-                        style: TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: headerTextColor,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
+    Widget tableContent = SizedBox(
+      width: tableWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Header
+          Container(
+            color: headerBg,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            child: Row(
+              children: List.generate(
+                headers.length,
+                (i) => SizedBox(
+                  width: computedWidths[i],
+                  child: Text(
+                    headers[i],
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: headerTextColor,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ),
               ),
-              Divider(height: 1, thickness: 1, color: borderColor),
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: borderColor),
 
-              // Rows
-              ...List.generate(rows.length, (index) {
-                final isEven = index % 2 == 0;
-                final rowBg = isDark
-                    ? (isEven ? AppTheme.darkSurface : const Color(0xFF1A1730))
-                    : (isEven ? Colors.white : const Color(0xFFFAFAFF));
-                final isLast = index == rows.length - 1;
+          // ── Rows
+          ...List.generate(rows.length, (index) {
+            final isEven = index % 2 == 0;
+            final rowBg = isDark
+                ? (isEven ? AppTheme.darkSurface : const Color(0xFF1A1730))
+                : (isEven ? Colors.white : const Color(0xFFFAFAFF));
+            final isLast = index == rows.length - 1;
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      color: rowBg,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: List.generate(
-                          rows[index].length,
-                          (i) => SizedBox(
-                            width: i < computedWidths.length
-                                ? computedWidths[i]
-                                : 130,
-                            child: rows[index][i],
-                          ),
-                        ),
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  color: rowBg,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(
+                      rows[index].length,
+                      (i) => SizedBox(
+                        width: i < computedWidths.length
+                            ? computedWidths[i]
+                            : 130,
+                        child: rows[index][i],
                       ),
                     ),
-                    if (!isLast)
-                      Divider(height: 1, thickness: 1, color: borderColor),
-                  ],
-                );
-              }),
-            ],
-          ),
-        ),
+                  ),
+                ),
+                if (!isLast)
+                  Divider(height: 1, thickness: 1, color: borderColor),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+
+    if (!needsScroll) return tableContent;
+
+    // Scroll horizontal hanya kalau memang perlu
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: tableContent,
       ),
     );
   }

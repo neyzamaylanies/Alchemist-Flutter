@@ -50,7 +50,7 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header + search + sub-nav buttons
+            // ── Header (fixed, tidak ikut scroll)
             Container(
               color: isDark ? AppTheme.darkSurface : AppTheme.surface,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -103,7 +103,10 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  // Sub-nav buttons — wrap agar tidak overflow di layar sempit
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       _SubNavButton(
                         icon: Icons.assignment_rounded,
@@ -115,7 +118,6 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       _SubNavButton(
                         icon: Icons.category_rounded,
                         label: 'Kategori',
@@ -132,7 +134,7 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
               ),
             ),
 
-            // ── Tabel
+            // ── Tabel (scrollable vertikal)
             Expanded(
               child: BlocBuilder<EquipmentListBloc, EquipmentListState>(
                 builder: (context, state) {
@@ -156,6 +158,7 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
+                    clipBehavior: Clip.hardEdge,
                     child: DataTableCard(
                       isLoading: isLoading,
                       emptyMessage: 'Belum ada data peralatan',
