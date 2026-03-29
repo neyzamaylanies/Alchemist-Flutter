@@ -256,103 +256,108 @@ class DataTableCard extends StatelessWidget {
         ? AppTheme.darkTextSub
         : AppTheme.textSecondary;
 
-    // Sedikit buffer (1px per sisi border) supaya tidak pas-pasan
-    final available = screenWidth - 2;
+    // Kurangi scrollbar browser (~17px Chrome Windows) + border 2px
+    // supaya kolom terakhir tidak tertutup scrollbar vertikal halaman
+    const scrollbarReserve = 20.0;
+    final available = screenWidth - scrollbarReserve;
     final minTotal = _minTotalWidth;
     final needsScroll = minTotal > available;
 
-    final List<double> computedWidths;
-    if (!needsScroll) {
-      // Stretch: bagi sisa ruang merata ke semua kolom
-      final extra = available - minTotal;
-      final perCol = extra / headers.length;
-      computedWidths = _baseWidths.map((w) => w + perCol).toList();
-    } else {
-      computedWidths = List.of(_baseWidths);
+    // Kolom-kolom SELAIN kolom terakhir pakai SizedBox fixed-width.
+    // Kolom terakhir pakai Expanded → otomatis ambil sisa ruang,
+    // tidak pernah terpotong scrollbar.
+    Widget _headerRow(List<double> widths) {
+      return Container(
+        color: headerBg,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: List.generate(headers.length, (i) {
+            final isLast = i == headers.length - 1;
+            final child = Text(
+              headers[i],
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: headerTextColor,
+                letterSpacing: 0.4,
+              ),
+            );
+            return isLast
+                ? Expanded(child: child)
+                : SizedBox(width: widths[i], child: child);
+          }),
+        ),
+      );
     }
 
-    // Lebar total yang dipakai untuk SizedBox
-    final tableWidth = needsScroll ? minTotal : available;
+    Widget _dataRow(int index, List<double> widths) {
+      final isEven = index % 2 == 0;
+      final rowBg = isDark
+          ? (isEven ? AppTheme.darkSurface : const Color(0xFF1A1730))
+          : (isEven ? Colors.white : const Color(0xFFFAFAFF));
+      final isLast = index == rows.length - 1;
 
-    Widget tableContent = SizedBox(
-      width: tableWidth,
-      child: Column(
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            color: rowBg,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(rows[index].length, (i) {
+                final isLastCol = i == rows[index].length - 1;
+                return isLastCol
+                    ? Expanded(child: rows[index][i])
+                    : SizedBox(
+                        width: i < widths.length ? widths[i] : 130,
+                        child: rows[index][i],
+                      );
+              }),
+            ),
+          ),
+          if (!isLast) Divider(height: 1, thickness: 1, color: borderColor),
+        ],
+      );
+    }
+
+    if (!needsScroll) {
+      // Muat di layar: stretch semua kolom kecuali terakhir (Expanded)
+      final extra = available - minTotal;
+      final perCol = extra / headers.length;
+      final widths = _baseWidths.map((w) => w + perCol).toList();
+
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Header
-          Container(
-            color: headerBg,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            child: Row(
-              children: List.generate(
-                headers.length,
-                (i) => SizedBox(
-                  width: computedWidths[i],
-                  child: Text(
-                    headers[i],
-                    style: TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: headerTextColor,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _headerRow(widths),
           Divider(height: 1, thickness: 1, color: borderColor),
-
-          // ── Rows
-          ...List.generate(rows.length, (index) {
-            final isEven = index % 2 == 0;
-            final rowBg = isDark
-                ? (isEven ? AppTheme.darkSurface : const Color(0xFF1A1730))
-                : (isEven ? Colors.white : const Color(0xFFFAFAFF));
-            final isLast = index == rows.length - 1;
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  color: rowBg,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 11,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: List.generate(
-                      rows[index].length,
-                      (i) => SizedBox(
-                        width: i < computedWidths.length
-                            ? computedWidths[i]
-                            : 130,
-                        child: rows[index][i],
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isLast)
-                  Divider(height: 1, thickness: 1, color: borderColor),
-              ],
-            );
-          }),
+          ...List.generate(rows.length, (i) => _dataRow(i, widths)),
         ],
-      ),
-    );
+      );
+    }
 
-    if (!needsScroll) return tableContent;
-
-    // Scroll horizontal hanya kalau memang perlu
+    // Tidak muat: scroll horizontal, tapi kolom terakhir tetap Expanded
+    // di dalam SizedBox sekecil minTotal supaya tidak bocor
     return Scrollbar(
       thumbVisibility: true,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        child: tableContent,
+        child: SizedBox(
+          width: minTotal,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _headerRow(_baseWidths),
+              Divider(height: 1, thickness: 1, color: borderColor),
+              ...List.generate(rows.length, (i) => _dataRow(i, _baseWidths)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -369,20 +374,23 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: AppTheme.fontFamily,
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
