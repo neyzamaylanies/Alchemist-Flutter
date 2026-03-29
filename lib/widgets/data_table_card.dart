@@ -100,22 +100,34 @@ class DataTableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
 
     final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: _buildBody(context, isDark, isMobile, borderColor, screenWidth),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Pakai lebar actual widget, bukan lebar layar
+        final availableWidth = constraints.maxWidth;
+        final isMobile = availableWidth < 600;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: _buildBody(
+              context,
+              isDark,
+              isMobile,
+              borderColor,
+              availableWidth,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -237,9 +249,8 @@ class DataTableCard extends StatelessWidget {
         ? AppTheme.darkTextSub
         : AppTheme.textSecondary;
 
-    // Kalau layar lebih lebar dari jumlah kolom → stretch supaya tidak ada
-    // ruang kosong di kanan. Kalau lebih sempit → scroll horizontal aktif.
-    // Kurangi 2px untuk border kiri+kanan agar tidak trigger scroll sesaat.
+    // screenWidth di sini sudah merupakan lebar actual widget (dari LayoutBuilder),
+    // bukan lebar layar. Kurangi 2px untuk border kiri+kanan.
     final available = screenWidth - 2;
     final needsStretch = available > _minTotalWidth;
 

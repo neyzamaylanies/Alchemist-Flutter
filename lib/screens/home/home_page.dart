@@ -435,107 +435,287 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const SizedBox(height: 12),
+        // ── Cross-bloc builder: gabung transaksi + equipment + student ──────
         BlocBuilder<TransactionListBloc, TransactionListState>(
-          builder: (context, state) {
-            if (state is TransactionListLoading) {
+          builder: (context, trxState) {
+            if (trxState is TransactionListLoading) {
               return const _SkeletonLoader();
             }
-            if (state is TransactionListLoaded &&
-                state.transactions.isNotEmpty) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark
-                        ? AppTheme.darkBorder
-                        : const Color(0xFFE5E7EB),
-                  ),
-                ),
-                child: Column(
-                  children: state.transactions.take(5).map((t) {
-                    final isPeminjaman = t.isPeminjaman;
-                    final color = isPeminjaman
-                        ? AppTheme.warning
-                        : AppTheme.success;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color:
-                                (isDark
-                                        ? AppTheme.darkBorder
-                                        : const Color(0xFFE5E7EB))
-                                    .withValues(alpha: 0.5),
+            if (trxState is TransactionListLoaded &&
+                trxState.transactions.isNotEmpty) {
+              return BlocBuilder<EquipmentListBloc, EquipmentListState>(
+                builder: (context, eqState) {
+                  return BlocBuilder<StudentListBloc, StudentListState>(
+                    builder: (context, stuState) {
+                      // Build lookup maps biar O(1)
+                      final eqMap = <String, String>{};
+                      if (eqState is EquipmentListLoaded) {
+                        for (final eq in eqState.equipments) {
+                          eqMap[eq.id] = eq.equipmentName;
+                        }
+                      }
+
+                      final stuMap = <String, String>{};
+                      if (stuState is StudentListLoaded) {
+                        for (final s in stuState.students) {
+                          stuMap[s.id] = s.name;
+                        }
+                      }
+
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppTheme.darkSurface
+                              : AppTheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? AppTheme.darkBorder
+                                : const Color(0xFFE5E7EB),
                           ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              isPeminjaman
-                                  ? Icons.arrow_upward_rounded
-                                  : Icons.arrow_downward_rounded,
-                              color: color,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  t.id,
-                                  style: TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: isDark
-                                        ? AppTheme.darkText
-                                        : AppTheme.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  t.equipmentId,
-                                  style: TextStyle(
-                                    fontFamily: AppTheme.fontFamily,
-                                    color: isDark
-                                        ? AppTheme.darkTextSub
-                                        : AppTheme.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${t.quantity}x',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: isDark
-                                  ? AppTheme.darkText
-                                  : AppTheme.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
+                        child: Column(
+                          children:
+                              (List.of(trxState.transactions)..sort((a, b) {
+                                    final dateA =
+                                        DateTime.tryParse(
+                                          a.transactionDate ?? '',
+                                        ) ??
+                                        DateTime(0);
+                                    final dateB =
+                                        DateTime.tryParse(
+                                          b.transactionDate ?? '',
+                                        ) ??
+                                        DateTime(0);
+                                    return dateB.compareTo(dateA);
+                                  }))
+                                  .take(5)
+                                  .map((t) {
+                                    final isPeminjaman = t.isPeminjaman;
+                                    final color = isPeminjaman
+                                        ? AppTheme.warning
+                                        : AppTheme.success;
+
+                                    // Resolusi nama dari map, fallback ke id
+                                    final equipmentName =
+                                        eqMap[t.equipmentId] ?? t.equipmentId;
+                                    final borrowerName =
+                                        stuMap[t.usedBy ?? ''] ??
+                                        t.usedBy ??
+                                        '-';
+                                    final adminName = t.handledBy;
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color:
+                                                (isDark
+                                                        ? AppTheme.darkBorder
+                                                        : const Color(
+                                                            0xFFE5E7EB,
+                                                          ))
+                                                    .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // ── Ikon tipe transaksi ────────────────
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: color.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              isPeminjaman
+                                                  ? Icons.arrow_upward_rounded
+                                                  : Icons
+                                                        .arrow_downward_rounded,
+                                              color: color,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // ── Info utama: ID + nama alat + peminjam ──
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                // Baris 1: ID transaksi
+                                                Text(
+                                                  t.id,
+                                                  style: TextStyle(
+                                                    fontFamily:
+                                                        AppTheme.fontFamily,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                    color: isDark
+                                                        ? AppTheme.darkText
+                                                        : AppTheme.textPrimary,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                // Baris 2: Nama alat
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.science_rounded,
+                                                      size: 11,
+                                                      color: isDark
+                                                          ? AppTheme.darkTextSub
+                                                          : AppTheme
+                                                                .textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Expanded(
+                                                      child: Text(
+                                                        equipmentName,
+                                                        style: TextStyle(
+                                                          fontFamily: AppTheme
+                                                              .fontFamily,
+                                                          fontSize: 11,
+                                                          color: isDark
+                                                              ? AppTheme
+                                                                    .darkTextSub
+                                                              : AppTheme
+                                                                    .textSecondary,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                // Baris 3: Peminjam + Admin
+                                                Row(
+                                                  children: [
+                                                    // Peminjam
+                                                    Icon(
+                                                      Icons.person_rounded,
+                                                      size: 11,
+                                                      color: isDark
+                                                          ? AppTheme.darkTextSub
+                                                          : AppTheme
+                                                                .textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Flexible(
+                                                      child: Text(
+                                                        borrowerName,
+                                                        style: TextStyle(
+                                                          fontFamily: AppTheme
+                                                              .fontFamily,
+                                                          fontSize: 11,
+                                                          color: isDark
+                                                              ? AppTheme
+                                                                    .darkTextSub
+                                                              : AppTheme
+                                                                    .textSecondary,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    // Separator
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 4,
+                                                          ),
+                                                      child: Text(
+                                                        '·',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: isDark
+                                                              ? AppTheme
+                                                                    .darkTextSub
+                                                              : AppTheme
+                                                                    .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    // Admin
+                                                    Icon(
+                                                      Icons.badge_rounded,
+                                                      size: 11,
+                                                      color: isDark
+                                                          ? AppTheme.darkTextSub
+                                                          : AppTheme
+                                                                .textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Flexible(
+                                                      child: Text(
+                                                        adminName,
+                                                        style: TextStyle(
+                                                          fontFamily: AppTheme
+                                                              .fontFamily,
+                                                          fontSize: 11,
+                                                          color: isDark
+                                                              ? AppTheme
+                                                                    .darkTextSub
+                                                              : AppTheme
+                                                                    .textSecondary,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // ── Quantity + Badge tipe ──────────────
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                '${t.quantity}x',
+                                                style: TextStyle(
+                                                  fontFamily:
+                                                      AppTheme.fontFamily,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
+                                                  color: isDark
+                                                      ? AppTheme.darkText
+                                                      : AppTheme.textPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              _StatusBadge(
+                                                label: t.typeLabel,
+                                                color: color,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  })
+                                  .toList(),
+                        ),
+                      );
+                    },
+                  );
+                },
               );
             }
             return _buildEmptyState(
@@ -704,7 +884,7 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
@@ -714,7 +894,7 @@ class _StatusBadge extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w600,
           fontFamily: AppTheme.fontFamily,
         ),
