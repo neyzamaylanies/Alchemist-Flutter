@@ -62,7 +62,7 @@ class _UserListPageState extends State<UserListPage> {
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : AppTheme.background,
       appBar: AppBar(
-        title: const Text('User Management',
+        title: const Text('Data Petugas',
           style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600, fontSize: 16)),
         backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surface,
         foregroundColor: isDark ? AppTheme.darkText : AppTheme.textPrimary,
@@ -77,7 +77,7 @@ class _UserListPageState extends State<UserListPage> {
             child: ElevatedButton.icon(
               onPressed: () => _showCreateDialog(context),
               icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Tambah User',
+              label: const Text('Tambah Petugas',
                 style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
@@ -90,38 +90,41 @@ class _UserListPageState extends State<UserListPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: SizedBox(
-              height: 42,
-              child: TextField(
-                onChanged: _onSearch,
-                style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Cari user...',
-                  prefixIcon: Icon(Icons.search_rounded, size: 18,
-                    color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-                  filled: true,
-                  fillColor: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+      // SingleChildScrollView supaya tidak overflow
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Search bar
+            Container(
+              color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: SizedBox(
+                height: 42,
+                child: TextField(
+                  onChanged: _onSearch,
+                  style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
+                    color: isDark ? AppTheme.darkText : AppTheme.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Cari petugas...',
+                    prefixIcon: Icon(Icons.search_rounded, size: 18,
+                      color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
+                    filled: true,
+                    fillColor: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: DataTableCard(
+            // Tabel
+            DataTableCard(
               isLoading: _isLoading,
-              emptyMessage: 'Belum ada user',
+              emptyMessage: 'Belum ada petugas',
               emptyIcon: Icons.manage_accounts_rounded,
               headers: const ['ID', 'NAMA', 'EMAIL', 'ROLE', 'AKSI'],
               rows: _filtered.map((u) {
@@ -147,7 +150,6 @@ class _UserListPageState extends State<UserListPage> {
                     label: u['role'] ?? '',
                     color: isAdmin ? AppTheme.primary : AppTheme.success,
                   ),
-                  // Tombol Edit & Hapus
                   Row(children: [
                     IconButton(
                       icon: const Icon(Icons.edit_rounded, size: 18, color: AppTheme.primary),
@@ -163,15 +165,15 @@ class _UserListPageState extends State<UserListPage> {
                 ];
               }).toList(),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   // ─── Create ───────────────────────────────────────────────────────────────
   void _showCreateDialog(BuildContext context) {
-    final idCtrl = TextEditingController();
+    final idCtrl   = TextEditingController();
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
@@ -183,7 +185,7 @@ class _UserListPageState extends State<UserListPage> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setStateDialog) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Tambah User',
+          title: const Text('Tambah Petugas',
             style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
           content: SizedBox(
             width: 400,
@@ -216,14 +218,11 @@ class _UserListPageState extends State<UserListPage> {
               text: 'Simpan',
               onPressed: () async {
                 if (idCtrl.text.isEmpty || nameCtrl.text.isEmpty) {
-                  _showSnack('ID dan Nama wajib diisi!', isError: true);
-                  return;
+                  _showSnack('ID dan Nama wajib diisi!', isError: true); return;
                 }
-                // Cek duplikat ID
                 final isDuplicate = _users.any((u) => u['id'] == idCtrl.text.trim());
                 if (isDuplicate) {
-                  _showSnack('ID "${idCtrl.text}" sudah ada!', isError: true);
-                  return;
+                  _showSnack('ID "${idCtrl.text}" sudah ada!', isError: true); return;
                 }
                 setStateDialog(() => loading = true);
                 try {
@@ -236,10 +235,10 @@ class _UserListPageState extends State<UserListPage> {
                   });
                   if (ctx.mounted) Navigator.pop(ctx);
                   _loadUsers();
-                  _showSnack('User berhasil ditambahkan!');
+                  _showSnack('Petugas berhasil ditambahkan!');
                 } catch (_) {
                   setStateDialog(() => loading = false);
-                  _showSnack('Gagal menambahkan user!', isError: true);
+                  _showSnack('Gagal menambahkan petugas!', isError: true);
                 }
               },
             ),
@@ -251,9 +250,9 @@ class _UserListPageState extends State<UserListPage> {
 
   // ─── Edit ─────────────────────────────────────────────────────────────────
   void _showEditDialog(BuildContext context, Map<String, dynamic> user) {
-    final nameCtrl = TextEditingController(text: user['name']);
+    final nameCtrl  = TextEditingController(text: user['name']);
     final emailCtrl = TextEditingController(text: user['email']);
-    final passCtrl = TextEditingController();
+    final passCtrl  = TextEditingController();
     String role = user['role'] ?? 'PETUGAS';
     bool loading = false;
 
@@ -262,7 +261,7 @@ class _UserListPageState extends State<UserListPage> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setStateDialog) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Edit User — ${user['id']}',
+          title: Text('Edit Petugas — ${user['id']}',
             style: const TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
           content: SizedBox(
             width: 400,
@@ -294,19 +293,15 @@ class _UserListPageState extends State<UserListPage> {
               onPressed: () async {
                 setStateDialog(() => loading = true);
                 try {
-                  final body = {
-                    'name': nameCtrl.text,
-                    'email': emailCtrl.text,
-                    'role': role,
-                  };
+                  final body = {'name': nameCtrl.text, 'email': emailCtrl.text, 'role': role};
                   if (passCtrl.text.isNotEmpty) body['password'] = passCtrl.text;
                   await RemoteHelper.getDio().put('api/users/${user['id']}', data: body);
                   if (ctx.mounted) Navigator.pop(ctx);
                   _loadUsers();
-                  _showSnack('User berhasil diupdate!');
+                  _showSnack('Petugas berhasil diupdate!');
                 } catch (_) {
                   setStateDialog(() => loading = false);
-                  _showSnack('Gagal mengupdate user!', isError: true);
+                  _showSnack('Gagal mengupdate petugas!', isError: true);
                 }
               },
             ),
@@ -320,24 +315,26 @@ class _UserListPageState extends State<UserListPage> {
   void _showDeleteDialog(BuildContext context, Map<String, dynamic> user) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus User',
+        title: const Text('Hapus Petugas',
           style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
         content: Text('Yakin ingin menghapus "${user['name']}"?',
           style: const TextStyle(fontFamily: AppTheme.fontFamily)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal')),
           ElevatedButton(
             onPressed: () async {
+              // Tutup dialog dulu sebelum async
+              Navigator.pop(dialogCtx);
               try {
                 await RemoteHelper.getDio().delete('api/users/${user['id']}');
-                if (context.mounted) Navigator.pop(context);
                 _loadUsers();
-                _showSnack('User berhasil dihapus!');
+                _showSnack('Petugas berhasil dihapus!');
               } catch (_) {
-                if (context.mounted) Navigator.pop(context);
-                _showSnack('Gagal menghapus user!', isError: true);
+                _showSnack('Gagal menghapus petugas!', isError: true);
               }
             },
             style: ElevatedButton.styleFrom(

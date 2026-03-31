@@ -7,7 +7,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/remote_helper.dart';
 import '../../models/ui/student.dart';
 import '../student/student_list_page.dart';
-import 'user_list_page.dart';
+import '../user/user_list_page.dart';
 
 class UserTabPage extends StatefulWidget {
   const UserTabPage({super.key});
@@ -40,6 +40,8 @@ class _UserTabPageState extends State<UserTabPage> {
     try {
       final res = await RemoteHelper.getDio().get('api/users');
       final data = (res.data['data'] as List<dynamic>?) ?? [];
+      // Sort terbaru dulu berdasarkan ID (descending)
+      data.sort((a, b) => (b['id'] ?? '').compareTo(a['id'] ?? ''));
       setState(() {
         _recentUsers = data.take(3).toList();
         _loadingUsers = false;
@@ -153,7 +155,8 @@ class _UserTabPageState extends State<UserTabPage> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (state is StudentListLoaded) {
-                    final recent = state.students.take(3).toList();
+                    final sorted = [...state.students]..sort((a, b) => b.id.compareTo(a.id));
+                    final recent = sorted.take(3).toList();
                     if (recent.isEmpty) {
                       return _EmptyCard(
                         message: 'Belum ada mahasiswa',
