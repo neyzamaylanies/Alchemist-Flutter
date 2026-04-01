@@ -1,475 +1,216 @@
-// lib/screens/user/user_tab_page.dart
+// lib/screens/student/student_list_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/student/student_list_bloc.dart';
+import '../../models/ui/student.dart';
 import '../../repositories/student_repository.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/remote_helper.dart';
-import '../../models/ui/student.dart';
-import '../student/student_list_page.dart';
-import '../user/user_list_page.dart';
+import '../../widgets/data_table_card.dart';
+import 'student_detail_page.dart';
 
-class UserTabPage extends StatefulWidget {
-  const UserTabPage({super.key});
+class StudentListPage extends StatefulWidget {
+  const StudentListPage({super.key});
 
   @override
-  State<UserTabPage> createState() => _UserTabPageState();
+  State<StudentListPage> createState() => _StudentListPageState();
 }
 
-class _UserTabPageState extends State<UserTabPage> {
-  late final StudentListBloc _studentBloc;
-  List<dynamic> _recentUsers = [];
-  bool _loadingUsers = true;
+class _StudentListPageState extends State<StudentListPage> {
+  late final StudentListBloc _bloc;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _studentBloc = StudentListBloc(
+    _bloc = StudentListBloc(
       studentRepository: StudentRepository(RemoteHelper.getDio()),
     )..add(LoadStudentListEvent());
-    _loadRecentUsers();
   }
 
   @override
   void dispose() {
-    _studentBloc.close();
+    _bloc.close();
     super.dispose();
   }
 
-  Future<void> _loadRecentUsers() async {
-    try {
-      final res = await RemoteHelper.getDio().get('api/users');
-      final data = (res.data['data'] as List<dynamic>?) ?? [];
-      // Sort terbaru dulu berdasarkan ID (descending)
-      data.sort((a, b) => (b['id'] ?? '').compareTo(a['id'] ?? ''));
-      setState(() {
-        _recentUsers = data.take(3).toList();
-        _loadingUsers = false;
-      });
-    } catch (_) {
-      setState(() => _loadingUsers = false);
-    }
+  void _showSnack(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontFamily: AppTheme.fontFamily)),
+      backgroundColor: isError ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppTheme.darkBg : AppTheme.background;
-    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final bgColor   = isDark ? AppTheme.darkBg : AppTheme.background;
     final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
-    final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
+    final subColor  = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
 
     return BlocProvider.value(
-      value: _studentBloc,
+      value: _bloc,
       child: Scaffold(
         backgroundColor: bgColor,
+        appBar: AppBar(
+          title: const Text('Data Mahasiswa',
+            style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
+          backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surface,
+          foregroundColor: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Manajemen User',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Kelola data petugas dan mahasiswa',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 13,
-                  color: subColor,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 2 tombol navigasi
-              Row(
-                children: [
+              // Search + Tambah
+              Container(
+                color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(children: [
                   Expanded(
-                    child: _NavCard(
-                      icon: Icons.manage_accounts_rounded,
-                      label: 'Petugas',
-                      subtitle: 'Kelola user & admin',
-                      gradient: AppTheme.primaryGradient,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const UserListPage()),
+                    child: TextField(
+                      onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+                      style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor),
+                      decoration: const InputDecoration(
+                        hintText: 'Cari mahasiswa...',
+                        prefixIcon: Icon(Icons.search_rounded, size: 18),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                        constraints: BoxConstraints(maxHeight: 42),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: _NavCard(
-                      icon: Icons.school_rounded,
-                      label: 'Mahasiswa',
-                      subtitle: 'Kelola data mahasiswa',
-                      gradient: AppTheme.blueGradient,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const StudentListPage(),
-                        ),
-                      ),
-                    ),
+                  ElevatedButton.icon(
+                    onPressed: () => _onCreateClick(context),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Tambah'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
                   ),
-                ],
+                ]),
               ),
-              const SizedBox(height: 24),
 
-              // Recent Petugas
-              _SectionHeader(title: 'Petugas Terbaru', isDark: isDark),
-              const SizedBox(height: 12),
-              _loadingUsers
-                  ? const Center(child: CircularProgressIndicator())
-                  : _recentUsers.isEmpty
-                  ? _EmptyCard(message: 'Belum ada petugas', isDark: isDark)
-                  : Column(
-                      children: _recentUsers
-                          .map(
-                            (u) => _UserCard(
-                              user: u,
-                              cardColor: cardColor,
-                              borderColor: borderColor,
-                              textColor: textColor,
-                              subColor: subColor,
-                              isDark: isDark,
-                            ),
-                          )
-                          .toList(),
-                    ),
-              const SizedBox(height: 24),
-
-              // Recent Mahasiswa
-              _SectionHeader(title: 'Mahasiswa Terbaru', isDark: isDark),
-              const SizedBox(height: 12),
+              // Tabel
               BlocBuilder<StudentListBloc, StudentListState>(
                 builder: (context, state) {
-                  if (state is StudentListLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (state is StudentListLoaded) {
-                    final sorted = [...state.students]..sort((a, b) => b.id.compareTo(a.id));
-                    final recent = sorted.take(3).toList();
-                    if (recent.isEmpty) {
-                      return _EmptyCard(
-                        message: 'Belum ada mahasiswa',
-                        isDark: isDark,
-                      );
-                    }
-                    return Column(
-                      children: recent
-                          .map(
-                            (s) => _StudentCard(
-                              student: s,
-                              cardColor: cardColor,
-                              borderColor: borderColor,
-                              textColor: textColor,
-                              subColor: subColor,
-                            ),
-                          )
-                          .toList(),
-                    );
-                  }
-                  return _EmptyCard(
-                    message: 'Gagal memuat data',
-                    isDark: isDark,
+                  final isLoading = state is StudentListLoading;
+
+                  var students = state is StudentListLoaded
+                      ? state.students.where((s) =>
+                          s.name.toLowerCase().contains(_searchQuery) ||
+                          s.nim.toLowerCase().contains(_searchQuery) ||
+                          s.studyProgram.toLowerCase().contains(_searchQuery)
+                        ).toList()
+                      : <Student>[];
+
+                  // Sort: terbaru berdasarkan ID (karena tidak ada createdAt di model)
+                  // ID biasanya incremental jadi sort descending
+                  students.sort((a, b) => b.id.compareTo(a.id));
+
+                  return DataTableCard(
+                    isLoading: isLoading,
+                    emptyMessage: 'Belum ada data mahasiswa',
+                    emptyIcon: Icons.people_rounded,
+                    headers: const ['ID', 'NIM', 'NAMA', 'PROGRAM STUDI', 'NO. HP', 'AKSI'],
+                    rows: students.map((s) => [
+                      Text(s.id, style: TextStyle(fontFamily: AppTheme.fontFamily,
+                        fontSize: 12, color: subColor)),
+                      Text(s.nim, style: TextStyle(fontFamily: AppTheme.fontFamily,
+                        fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+                      Row(children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                          child: Text(s.name[0].toUpperCase(),
+                            style: const TextStyle(color: AppTheme.primary,
+                              fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(child: Text(s.name, style: TextStyle(
+                          fontFamily: AppTheme.fontFamily, fontSize: 13,
+                          fontWeight: FontWeight.w500, color: textColor),
+                          overflow: TextOverflow.ellipsis)),
+                      ]),
+                      Text(s.studyProgram, style: TextStyle(fontFamily: AppTheme.fontFamily,
+                        fontSize: 12, color: subColor), overflow: TextOverflow.ellipsis),
+                      Text(s.phone ?? '-', style: TextStyle(fontFamily: AppTheme.fontFamily,
+                        fontSize: 12, color: subColor)),
+                      Row(children: [
+                        ActionButton(
+                          icon: Icons.edit_rounded,
+                          color: AppTheme.primary,
+                          tooltip: 'Edit',
+                          onTap: () => _onEditClick(context, s),
+                        ),
+                        const SizedBox(width: 6),
+                        ActionButton(
+                          icon: Icons.delete_rounded,
+                          color: AppTheme.error,
+                          tooltip: 'Hapus',
+                          onTap: () => _onDeleteClick(context, s), // ← fix: pakai _onDeleteClick
+                        ),
+                      ]),
+                    ]).toList(),
                   );
                 },
               ),
-              const SizedBox(height: 80),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-class _NavCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final LinearGradient gradient;
-  final VoidCallback onTap;
-
-  const _NavCard({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.gradient,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Text(
-                  'Lihat semua',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 11,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 12,
-                  color: Colors.white,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  void _onCreateClick(BuildContext context) async {
+    final result = await showStudentForm(context);
+    if (result is StudentCreatedResult) {
+      _bloc.add(AddNewStudentEvent(newStudent: result.student));
+    }
   }
-}
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final bool isDark;
-  const _SectionHeader({required this.title, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontFamily: AppTheme.fontFamily,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
-      ),
-    );
+  void _onEditClick(BuildContext context, Student s) async {
+    final result = await showStudentForm(context, student: s);
+    if (result is StudentUpdatedResult) {
+      _bloc.add(UpdateStudentEvent(updatedStudent: result.student));
+    } else if (result is StudentDeletedResult) {
+      _bloc.add(DeleteStudentEvent(deletedStudent: result.student));
+    }
   }
-}
 
-class _EmptyCard extends StatelessWidget {
-  final String message;
-  final bool isDark;
-  const _EmptyCard({required this.message, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
-        ),
-      ),
-      child: Center(
-        child: Text(
-          message,
-          style: TextStyle(
-            fontFamily: AppTheme.fontFamily,
-            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _UserCard extends StatelessWidget {
-  final dynamic user;
-  final Color cardColor, borderColor, textColor, subColor;
-  final bool isDark;
-  const _UserCard({
-    required this.user,
-    required this.cardColor,
-    required this.borderColor,
-    required this.textColor,
-    required this.subColor,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isAdmin = (user['role'] ?? '') == 'ADMIN';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-            child: Text(
-              (user['name'] ?? 'U')[0].toUpperCase(),
-              style: const TextStyle(
-                color: AppTheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user['name'] ?? '',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: textColor,
-                  ),
-                ),
-                Text(
-                  user['email'] ?? '',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 12,
-                    color: subColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: (isAdmin ? AppTheme.primary : AppTheme.success).withValues(
-                alpha: 0.1,
-              ),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: (isAdmin ? AppTheme.primary : AppTheme.success)
-                    .withValues(alpha: 0.3),
-              ),
-            ),
-            child: Text(
-              user['role'] ?? '',
-              style: TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isAdmin ? AppTheme.primary : AppTheme.success,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StudentCard extends StatelessWidget {
-  final Student student;
-  final Color cardColor, borderColor, textColor, subColor;
-  const _StudentCard({
-    required this.student,
-    required this.cardColor,
-    required this.borderColor,
-    required this.textColor,
-    required this.subColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppTheme.blueDeep.withValues(alpha: 0.15),
-            child: Text(
-              student.name[0].toUpperCase(),
-              style: const TextStyle(
-                color: AppTheme.blueDeep,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  student.name,
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: textColor,
-                  ),
-                ),
-                Text(
-                  '${student.nim} • ${student.studyProgram}',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 12,
-                    color: subColor,
-                  ),
-                ),
-              ],
-            ),
+  void _onDeleteClick(BuildContext context, Student s) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hapus Mahasiswa',
+          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
+        content: Text('Yakin ingin menghapus "${s.name}"?',
+          style: const TextStyle(fontFamily: AppTheme.fontFamily)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx); // tutup dialog dulu
+              try {
+                await RemoteHelper.getDio().delete('api/students/${s.id}');
+                _bloc.add(DeleteStudentEvent(deletedStudent: s));
+                _showSnack('Mahasiswa berhasil dihapus!');
+              } catch (_) {
+                _showSnack('Gagal menghapus mahasiswa!', isError: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error, foregroundColor: Colors.white),
+            child: const Text('Hapus'),
           ),
         ],
       ),

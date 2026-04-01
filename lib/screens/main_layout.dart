@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
+// import 'package:provider/provider.dart';
 
 import '../blocs/equipment/equipment_list_bloc.dart';
 import '../blocs/transaction/transaction_list_bloc.dart';
@@ -14,8 +14,8 @@ import '../repositories/student_repository.dart';
 import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
 import '../utils/session_helper.dart';
-import '../utils/theme_provider.dart';
-import '../utils/routes.dart';
+// import '../utils/theme_provider.dart';
+// import '../utils/routes.dart';
 
 class MainLayout extends StatefulWidget {
   final StatefulNavigationShell navigationShell;

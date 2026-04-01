@@ -156,113 +156,109 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
                     categories = state.categories;
                   }
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    clipBehavior: Clip.hardEdge,
-                    child: DataTableCard(
-                      isLoading: isLoading,
-                      emptyMessage: 'Belum ada data peralatan',
-                      emptyIcon: Icons.science_rounded,
-                      headers: const [
-                        'ID',
-                        'NAMA',
-                        'KATEGORI',
-                        'TERSEDIA',
-                        'TOTAL',
-                        'STATUS',
-                        'LOKASI',
-                        'AKSI',
-                      ],
-                      rows: equipments.map((eq) {
-                        final color = AppTheme.getKondisiColor(
-                          eq.conditionStatus,
-                        );
-                        String catName = eq.categoryId;
-                        try {
-                          catName =
-                              categories
-                                  .firstWhere((c) => c.id == eq.categoryId)
-                                  ?.categoryName ??
-                              eq.categoryId;
-                        } catch (_) {}
+                  return DataTableCard(
+                    isLoading: isLoading,
+                    emptyMessage: 'Belum ada data peralatan',
+                    emptyIcon: Icons.science_rounded,
+                    headers: const [
+                      'ID',
+                      'NAMA',
+                      'KATEGORI',
+                      'TERSEDIA',
+                      'TOTAL',
+                      'STATUS',
+                      'LOKASI',
+                      'AKSI',
+                    ],
+                    rows: equipments.map((eq) {
+                      final color = AppTheme.getKondisiColor(
+                        eq.conditionStatus,
+                      );
+                      String catName = eq.categoryId;
+                      try {
+                        catName =
+                            categories
+                                .firstWhere((c) => c.id == eq.categoryId)
+                                ?.categoryName ??
+                            eq.categoryId;
+                      } catch (_) {}
 
-                        return [
-                          Text(
-                            eq.id,
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 12,
-                              color: subColor,
+                      return [
+                        Text(
+                          eq.id,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
+                        Text(
+                          eq.equipmentName,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          catName,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
+                        Text(
+                          '${eq.availableQuantity}',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.success,
+                          ),
+                        ),
+                        Text(
+                          '${eq.totalQuantity}',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            color: textColor,
+                          ),
+                        ),
+                        StatusBadge(
+                          label: AppTheme.getKondisiLabel(eq.conditionStatus),
+                          color: color,
+                        ),
+                        Text(
+                          eq.location,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Row(
+                          children: [
+                            ActionButton(
+                              icon: Icons.edit_rounded,
+                              color: AppTheme.primary,
+                              tooltip: 'Edit',
+                              onTap: () => _onEditClick(context, eq),
                             ),
-                          ),
-                          Text(
-                            eq.equipmentName,
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
+                            const SizedBox(width: 6),
+                            ActionButton(
+                              icon: Icons.delete_rounded,
+                              color: AppTheme.error,
+                              tooltip: 'Hapus',
+                              onTap: () => _onDeleteClick(context, eq),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            catName,
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 12,
-                              color: subColor,
-                            ),
-                          ),
-                          Text(
-                            '${eq.availableQuantity}',
-                            style: const TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.success,
-                            ),
-                          ),
-                          Text(
-                            '${eq.totalQuantity}',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 13,
-                              color: textColor,
-                            ),
-                          ),
-                          StatusBadge(
-                            label: AppTheme.getKondisiLabel(eq.conditionStatus),
-                            color: color,
-                          ),
-                          Text(
-                            eq.location,
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 12,
-                              color: subColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              ActionButton(
-                                icon: Icons.edit_rounded,
-                                color: AppTheme.primary,
-                                tooltip: 'Edit',
-                                onTap: () => _onEditClick(context, eq),
-                              ),
-                              const SizedBox(width: 6),
-                              ActionButton(
-                                icon: Icons.delete_rounded,
-                                color: AppTheme.error,
-                                tooltip: 'Hapus',
-                                onTap: () => _onDeleteClick(context, eq),
-                              ),
-                            ],
-                          ),
-                        ];
-                      }).toList(),
-                    ),
+                          ],
+                        ),
+                      ];
+                    }).toList(),
                   );
                 },
               ),
@@ -297,10 +293,20 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
     }
   }
 
+  void _showSnack(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontFamily: AppTheme.fontFamily)),
+      backgroundColor: isError ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
   void _onDeleteClick(BuildContext context, Equipment eq) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Hapus Alat',
@@ -310,20 +316,29 @@ class _EquipmentListPageState extends State<EquipmentListPage> {
           ),
         ),
         content: Text(
-          'Hapus "${eq.equipmentName}"?',
+          'Yakin ingin menghapus "${eq.equipmentName}"?',
           style: const TextStyle(fontFamily: AppTheme.fontFamily),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _onEditClick(context, eq);
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                await RemoteHelper.getDio().delete('api/equipments/${eq.id}');
+                _bloc.add(DeleteEquipmentEvent(deletedEquipment: eq));
+                _showSnack('Alat berhasil dihapus!');
+              } catch (_) {
+                _showSnack('Gagal menghapus alat!', isError: true);
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Hapus'),
           ),
         ],

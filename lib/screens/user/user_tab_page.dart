@@ -40,10 +40,16 @@ class _UserTabPageState extends State<UserTabPage> {
     try {
       final res = await RemoteHelper.getDio().get('api/users');
       final data = (res.data['data'] as List<dynamic>?) ?? [];
-      // Sort terbaru dulu berdasarkan ID (descending)
-      data.sort((a, b) => (b['id'] ?? '').compareTo(a['id'] ?? ''));
+      // Sort terbaru: pakai createdAt kalau ada, fallback ke urutan balik API
+      final sorted = [...data];
+      sorted.sort((a, b) {
+        final dateA = DateTime.tryParse(a['createdAt'] ?? '');
+        final dateB = DateTime.tryParse(b['createdAt'] ?? '');
+        if (dateA != null && dateB != null) return dateB.compareTo(dateA);
+        return data.indexOf(b).compareTo(data.indexOf(a));
+      });
       setState(() {
-        _recentUsers = data.take(3).toList();
+        _recentUsers = sorted.take(3).toList();
         _loadingUsers = false;
       });
     } catch (_) {

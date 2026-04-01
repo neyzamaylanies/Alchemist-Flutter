@@ -1,14 +1,31 @@
 {
     "version": "0.2.0",
     "configurations": [
-        
         {
             "name": "Alchemist (Dev)",
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
             "toolArgs": [
-                "--dart-define-from-file=env/dev.json"
+                "--dart-define=BASE_URL=http://localhost:8080/"
+            ]
+        },
+        {
+            "name": "Alchemist (Mobile - Kampus)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "toolArgs": [
+                "--dart-define=BASE_URL=http://192.168.10.113:8080/"
+            ]
+        },
+        {
+            "name": "Alchemist (Mobile - Rumah)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "toolArgs": [
+                "--dart-define=BASE_URL=http://192.168.xxx.xxx:8080/"
             ]
         },
         {
@@ -17,7 +34,7 @@
             "type": "dart",
             "program": "lib/main.dart",
             "toolArgs": [
-                "--dart-define-from-file=env/prod.json"
+                "--dart-define=BASE_URL=http://localhost:8080/"
             ]
         }
     ]
