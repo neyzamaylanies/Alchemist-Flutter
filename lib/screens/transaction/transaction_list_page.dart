@@ -1,14 +1,13 @@
-// lib/screens/transaction/transaction_list_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/transaction/transaction_list_bloc.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/remote_helper.dart';
 import '../../widgets/data_table_card.dart';
 import 'transaction_detail_page.dart';
 
 class TransactionListPage extends StatefulWidget {
-  final TransactionListBloc transactionBloc;
-  const TransactionListPage({super.key, required this.transactionBloc});
+  const TransactionListPage({super.key});
 
   @override
   State<TransactionListPage> createState() => _TransactionListPageState();
@@ -17,6 +16,51 @@ class TransactionListPage extends StatefulWidget {
 class _TransactionListPageState extends State<TransactionListPage> {
   String _searchQuery = '';
 
+  Map<String, String> _equipmentNames = {};
+  Map<String, String> _studentNames = {};
+  Map<String, String> _userNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLookups();
+    context.read<TransactionListBloc>().add(LoadTransactionListEvent());
+  }
+
+  Future<void> _loadLookups() async {
+    try {
+      final dio = RemoteHelper.getDio();
+      final results = await Future.wait([
+        dio.get('api/equipments'),
+        dio.get('api/students'),
+        dio.get('api/users'),
+      ]);
+
+      final eqMap = <String, String>{};
+      for (final e in (results[0].data['data'] as List<dynamic>? ?? [])) {
+        eqMap[e['id'] ?? ''] = e['equipmentName'] ?? e['id'] ?? '';
+      }
+
+      final stuMap = <String, String>{};
+      for (final s in (results[1].data['data'] as List<dynamic>? ?? [])) {
+        stuMap[s['id'] ?? ''] = s['name'] ?? s['id'] ?? '';
+      }
+
+      final userMap = <String, String>{};
+      for (final u in (results[2].data['data'] as List<dynamic>? ?? [])) {
+        userMap[u['id'] ?? ''] = u['name'] ?? u['id'] ?? '';
+      }
+
+      if (mounted) {
+        setState(() {
+          _equipmentNames = eqMap;
+          _studentNames = stuMap;
+          _userNames = userMap;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -24,98 +68,198 @@ class _TransactionListPageState extends State<TransactionListPage> {
     final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
     final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
 
-    return BlocProvider.value(
-      value: widget.transactionBloc,
-      child: Scaffold(
-        backgroundColor: bgColor,
-        body: Column(
-          children: [
-            Container(
-              color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Riwayat Transaksi', style: TextStyle(
-                          fontFamily: AppTheme.fontFamily, fontSize: 18,
-                          fontWeight: FontWeight.w700, color: textColor)),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _onCreateClick(context),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Tambah'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: Column(
+        children: [
+          // ── Header (fixed, tidak ikut scroll)
+          Container(
+            color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Riwayat Transaksi',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
-                    style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor),
-                    decoration: const InputDecoration(
-                      hintText: 'Cari transaksi...',
-                      prefixIcon: Icon(Icons.search_rounded, size: 18),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                      constraints: BoxConstraints(maxHeight: 42),
                     ),
+                    ElevatedButton.icon(
+                      onPressed: () => _onCreateClick(context),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Tambah'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  onChanged: (q) =>
+                      setState(() => _searchQuery = q.toLowerCase()),
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                    color: textColor,
                   ),
-                ],
-              ),
+                  decoration: const InputDecoration(
+                    hintText: 'Cari transaksi...',
+                    prefixIcon: Icon(Icons.search_rounded, size: 18),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 0,
+                    ),
+                    constraints: BoxConstraints(maxHeight: 42),
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: BlocBuilder<TransactionListBloc, TransactionListState>(
-                builder: (context, state) {
-                  final isLoading = state is TransactionListLoading;
-                  final transactions = state is TransactionListLoaded
-                      ? state.transactions.where((t) =>
-                          t.id.toLowerCase().contains(_searchQuery) ||
-                          t.equipmentId.toLowerCase().contains(_searchQuery) ||
-                          (t.usedBy?.toLowerCase().contains(_searchQuery) ?? false)
-                        ).toList()
-                      : [];
+          ),
 
-                  return DataTableCard(
+          // ── Konten tabel (scrollable vertikal)
+          Expanded(
+            child: BlocBuilder<TransactionListBloc, TransactionListState>(
+              builder: (context, state) {
+                final isLoading = state is TransactionListLoading;
+
+                final transactions = state is TransactionListLoaded
+                    ? state.transactions.where((t) {
+                        final eq =
+                            _equipmentNames[t.equipmentId]?.toLowerCase() ??
+                            t.equipmentId.toLowerCase();
+                        final stu =
+                            _studentNames[t.usedBy ?? '']?.toLowerCase() ?? '';
+                        final usr =
+                            _userNames[t.handledBy]?.toLowerCase() ??
+                            t.handledBy.toLowerCase();
+
+                        return t.id.toLowerCase().contains(_searchQuery) ||
+                            eq.contains(_searchQuery) ||
+                            stu.contains(_searchQuery) ||
+                            usr.contains(_searchQuery);
+                      }).toList()
+                    : <dynamic>[];
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  clipBehavior: Clip.hardEdge,
+                  child: DataTableCard(
                     isLoading: isLoading,
                     emptyMessage: 'Belum ada transaksi',
-                    emptyIcon: Icons.swap_horiz_rounded,
-                    headers: const ['ID', 'TIPE', 'ALAT', 'PEMINJAM', 'JUMLAH', 'PETUGAS', 'TANGGAL'],
+                    headers: const [
+                      'ID',
+                      'TIPE',
+                      'ALAT',
+                      'PEMINJAM',
+                      'JUMLAH',
+                      'PETUGAS',
+                      'TANGGAL',
+                    ],
                     rows: transactions.map((t) {
                       final isPeminjaman = t.isPeminjaman;
-                      final color = isPeminjaman ? AppTheme.warning : AppTheme.success;
-                      final dateStr = (t.transactionDate ?? '').toString().split('T').first;
+                      final color = isPeminjaman
+                          ? AppTheme.warning
+                          : AppTheme.success;
+
+                      final dateStr = (t.transactionDate ?? '')
+                          .toString()
+                          .split('T')
+                          .first;
+
+                      final eqName =
+                          _equipmentNames[t.equipmentId] ?? t.equipmentId;
+                      final stuName = t.usedBy != null
+                          ? (_studentNames[t.usedBy!] ?? t.usedBy!)
+                          : '-';
+                      final userName = _userNames[t.handledBy] ?? t.handledBy;
+
                       return [
-                        Text(t.id, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
+                        Text(
+                          t.id,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
                         StatusBadge(label: t.typeLabel, color: color),
-                        Text(t.equipmentId, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
-                        Text(t.usedBy ?? '-', style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
-                        Text('${t.quantity}x', style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
-                        Text(t.handledBy, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
-                        Text(dateStr, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12, color: subColor)),
+                        Text(
+                          eqName,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            color: textColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          stuName,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          '${t.quantity}x',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          userName,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
+                        Text(
+                          dateStr,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
                       ];
                     }).toList(),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // Push ke page baru (bukan dialog/popup)
   void _onCreateClick(BuildContext context) async {
-    var result = await Navigator.push(
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const TransactionDetailPage(transaction: null)),
+      MaterialPageRoute(
+        builder: (_) => TransactionDetailPage(
+          transaction: null,
+          equipmentNames: _equipmentNames,
+          studentNames: _studentNames,
+          userNames: _userNames,
+        ),
+      ),
     );
+
     if (result is TransactionCreatedResult) {
-      widget.transactionBloc.add(AddNewTransactionEvent(newTransaction: result.transaction));
+      context.read<TransactionListBloc>().add(
+        AddNewTransactionEvent(newTransaction: result.transaction),
+      );
+      _loadLookups();
     }
   }
 }
