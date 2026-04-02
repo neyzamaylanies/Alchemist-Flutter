@@ -66,39 +66,39 @@ class _StudentListPageState extends State<StudentListPage> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Search + Tambah
-              Container(
-                color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(children: [
-                  Expanded(
-                    child: TextField(
-                      onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
-                      style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor),
-                      decoration: const InputDecoration(
-                        hintText: 'Cari mahasiswa...',
-                        prefixIcon: Icon(Icons.search_rounded, size: 18),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                        constraints: BoxConstraints(maxHeight: 42),
-                      ),
+        body: Column(
+          children: [
+            // Search + Tambah
+            Container(
+              color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+                    style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: textColor),
+                    decoration: const InputDecoration(
+                      hintText: 'Cari mahasiswa...',
+                      prefixIcon: Icon(Icons.search_rounded, size: 18),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      constraints: BoxConstraints(maxHeight: 42),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _onCreateClick(context),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Tambah'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
-                  ),
-                ]),
-              ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _onCreateClick(context),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Tambah'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
+                ),
+              ]),
+            ),
 
-              // Tabel
-              BlocBuilder<StudentListBloc, StudentListState>(
+            // Tabel
+            Expanded(
+              child: BlocBuilder<StudentListBloc, StudentListState>(
                 builder: (context, state) {
                   final isLoading = state is StudentListLoading;
 
@@ -110,8 +110,6 @@ class _StudentListPageState extends State<StudentListPage> {
                         ).toList()
                       : <Student>[];
 
-                  // Sort: terbaru berdasarkan ID (karena tidak ada createdAt di model)
-                  // ID biasanya incremental jadi sort descending
                   students.sort((a, b) => b.id.compareTo(a.id));
 
                   return DataTableCard(
@@ -161,8 +159,8 @@ class _StudentListPageState extends State<StudentListPage> {
                   );
                 },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
