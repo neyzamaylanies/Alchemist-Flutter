@@ -1,68 +1,128 @@
 // lib/utils/routes.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+// Screens
+import '../screens/auth/login_page.dart';
 import '../screens/main_layout.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/search/search_result_page.dart';
 import '../screens/settings/settings_page.dart';
+import '../screens/home/home_page.dart';
+import '../screens/equipment/equipment_list_page.dart';
 import '../screens/equipment/equipment_detail_page.dart';
+import '../screens/transaction/transaction_list_page.dart';
 import '../screens/transaction/transaction_detail_page.dart';
 import '../screens/student/student_detail_page.dart';
+import '../screens/student/student_list_page.dart';
 import '../screens/category/category_list_page.dart';
 import '../screens/condition_log/condition_log_list_page.dart';
 import '../screens/user/user_list_page.dart';
-import '../screens/student/student_list_page.dart';
+import '../screens/user/user_tab_page.dart';
+
+// Models
 import '../models/ui/equipment.dart';
 import '../models/ui/transaction.dart';
 import '../models/ui/student.dart';
 
-class Routes {
-  static const String splash         = '/';
-  static const String main           = '/main';
-  static const String search         = '/search';
-  static const String settings       = '/settings';
-  static const String equipmentDetail = '/equipment/detail';
-  static const String transactionNew  = '/transaction/new';
-  static const String studentDetail   = '/student/detail';
-  static const String categoryList    = '/category';
-  static const String conditionLog    = '/condition-log';
-  static const String userList        = '/user';
-  static const String studentList     = '/student';
+class AppRouter {
+  static final GlobalKey<NavigatorState> _rootNavigatorKey =
+      GlobalKey<NavigatorState>();
 
-  static Map<String, WidgetBuilder> get routes => {
-    splash:   (_) => const SplashScreen(),
-    main:     (_) => const MainLayout(),
-    search:   (_) => const SearchResultPage(),
-    settings: (_) => const SettingsPage(),
-    categoryList: (_) => const CategoryListPage(),
-    conditionLog: (_) => const ConditionLogListPage(),
-    userList:     (_) => const UserListPage(),
-    studentList:  (_) => const StudentListPage(studentBloc: null),
-  };
+  static final GoRouter router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/splash',
 
-  // Untuk halaman yang butuh arguments
-  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case Routes.equipmentDetail:
-        final eq = settings.arguments as Equipment?;
-        return MaterialPageRoute(
-          builder: (_) => EquipmentDetailPage(equipment: eq),
-        );
-      case Routes.transactionNew:
-        return MaterialPageRoute(
-          builder: (_) => const TransactionDetailPage(transaction: null),
-        );
-      case Routes.studentDetail:
-        final s = settings.arguments as Student?;
-        return MaterialPageRoute(
-          builder: (_) => StudentDetailPage(student: s),
-        );
-      case Routes.search:
-        final query = settings.arguments as String? ?? '';
-        return MaterialPageRoute(
-          builder: (_) => SearchResultPage(initialQuery: query),
-        );
-      default:
-        return MaterialPageRoute(builder: (_) => const SplashScreen());
-    }
-  }
+    routes: [
+      // 🔹 AUTH & SPLASH
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+
+      // 🔹 MAIN (BOTTOM NAV)
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainLayout(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/dashboard',
+                builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/transaksi',
+                builder: (context, state) => const TransactionListPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/peralatan',
+                builder: (context, state) => const EquipmentListPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/user',
+                builder: (context, state) => const UserTabPage(),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // 🔹 OTHER PAGES
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchResultPage(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/category',
+        builder: (context, state) => const CategoryListPage(),
+      ),
+      GoRoute(
+        path: '/condition-log',
+        builder: (context, state) => const ConditionLogListPage(),
+      ),
+      GoRoute(
+        path: '/user-list',
+        builder: (context, state) => const UserListPage(),
+      ),
+      GoRoute(
+        path: '/student-list',
+        builder: (context, state) => const StudentListPage(),
+      ),
+
+      // 🔹 DETAIL
+      GoRoute(
+        path: '/detail/equipment',
+        builder: (context, state) =>
+            EquipmentDetailPage(equipment: state.extra as Equipment?),
+      ),
+      GoRoute(
+        path: '/detail/transaction',
+        builder: (context, state) =>
+            TransactionDetailPage(transaction: state.extra as Transaction?),
+      ),
+      GoRoute(
+        path: '/detail/student',
+        builder: (context, state) =>
+            StudentDetailPage(student: state.extra as Student?),
+      ),
+    ],
+  );
 }
