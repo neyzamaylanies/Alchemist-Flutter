@@ -12,8 +12,8 @@ class RemoteHelper {
       // Jika dijalankan di Web (Chrome/Edge dll)
       return 'http://localhost:8080/';
     } else if (Platform.isAndroid) {
-      // Jika dijalankan di Emulator Android
-      return 'http://192.168.1.5:8080/';
+      // Jika dijalankan di Emulator Android - bisa diubah kalau mau dijalanin di handphone sendiri (ganti pake ipv4, dan portnya tetap)
+      return 'http://10.0.2.2:8080/';
     } else {
       // Jika dijalankan di Windows, iOS Simulator, macOS, dll
       return 'http://localhost:8080/';
