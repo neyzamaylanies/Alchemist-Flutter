@@ -14,6 +14,11 @@ import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
 import '../utils/session_helper.dart';
 
+// Global RouteObserver — daftarkan di GoRouter kamu:
+// navigatorObservers: [routeObserver]
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
 class MainLayout extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const MainLayout({super.key, required this.navigationShell});
@@ -22,7 +27,7 @@ class MainLayout extends StatefulWidget {
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends State<MainLayout> with RouteAware {
   late final EquipmentListBloc _equipmentBloc;
   late final TransactionListBloc _transactionBloc;
   late final StudentListBloc _studentBloc;
@@ -44,27 +49,28 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) routeObserver.subscribe(this, route);
+  }
+
+  /// Otomatis refresh saat user kembali dari sub-page (Kategori, Kondisi Log, dll)
+  @override
+  void didPopNext() {
+    _refreshByIndex(widget.navigationShell.currentIndex);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _equipmentBloc.close();
     _transactionBloc.close();
     _studentBloc.close();
     super.dispose();
   }
 
-  void _onTap(int index) {
-    // Guest hanya bisa ke tab Peralatan (index 2)
-    if (SessionHelper.isGuest && index != 2) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Mode tamu hanya bisa melihat Peralatan.',
-          style: TextStyle(fontFamily: AppTheme.fontFamily)),
-        backgroundColor: AppTheme.warning,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-      return;
-    }
-
-    widget.navigationShell.goBranch(index);
+  void _refreshByIndex(int index) {
     switch (index) {
       case 0:
         _equipmentBloc.add(LoadEquipmentListEvent());
@@ -83,11 +89,34 @@ class _MainLayoutState extends State<MainLayout> {
     }
   }
 
+  void _onTap(int index) {
+    // Guest hanya bisa ke tab Peralatan (index 2)
+    if (SessionHelper.isGuest && index != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Mode tamu hanya bisa melihat Peralatan.',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    widget.navigationShell.goBranch(index);
+    _refreshByIndex(index);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final isGuest  = SessionHelper.isGuest;
+    final isGuest = SessionHelper.isGuest;
 
     return MultiBlocProvider(
       providers: [
@@ -110,13 +139,21 @@ class _MainLayoutState extends State<MainLayout> {
               label: 'Dashboard',
             ),
             BottomNavigationBarItem(
-              icon: Stack(children: [
-                const Icon(Icons.swap_horiz_rounded),
-                if (isGuest)
-                  Positioned(right: 0, top: 0,
-                    child: Icon(Icons.lock_rounded, size: 10,
-                      color: isDark ? AppTheme.darkTextSub : Colors.grey)),
-              ]),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded),
+                  if (isGuest)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 10,
+                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
               label: 'Transaksi',
             ),
             const BottomNavigationBarItem(
@@ -124,13 +161,21 @@ class _MainLayoutState extends State<MainLayout> {
               label: 'Peralatan',
             ),
             BottomNavigationBarItem(
-              icon: Stack(children: [
-                const Icon(Icons.people_rounded),
-                if (isGuest)
-                  Positioned(right: 0, top: 0,
-                    child: Icon(Icons.lock_rounded, size: 10,
-                      color: isDark ? AppTheme.darkTextSub : Colors.grey)),
-              ]),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.people_rounded),
+                  if (isGuest)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 10,
+                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
               label: 'User',
             ),
           ],
@@ -139,51 +184,86 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark, bool isMobile) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    bool isDark,
+    bool isMobile,
+  ) {
     return PreferredSize(
       preferredSize: Size.fromHeight(isMobile ? 56 : 64),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-          border: Border(bottom: BorderSide(
-            color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
+          border: Border(
+            bottom: BorderSide(
+              color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+            ),
+          ),
         ),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(children: [
-              Image.asset('assets/images/logo/LogoAlchemist.png', width: 32, height: 32),
-              const SizedBox(width: 8),
-              if (!isMobile)
-                Text('Alchemist', style: TextStyle(
-                  fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.bold,
-                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => context.push('/search'),
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/images/logo/LogoAlchemist.png',
+                  width: 32,
+                  height: 32,
+                ),
+                const SizedBox(width: 8),
+                if (!isMobile)
+                  Text(
+                    'Alchemist',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
                     ),
-                    child: Row(children: [
-                      Icon(Icons.search_rounded, size: 16,
-                        color: isDark ? AppTheme.darkTextSub : Colors.grey),
-                      const SizedBox(width: 8),
-                      Text('Cari...', style: TextStyle(
-                        color: isDark ? AppTheme.darkTextSub : Colors.grey, fontSize: 13)),
-                    ]),
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => context.push('/search'),
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkSurfaceVar
+                            : AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark
+                              ? AppTheme.darkBorder
+                              : const Color(0xFFE5E7EB),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            size: 16,
+                            color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Cari...',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppTheme.darkTextSub
+                                  : Colors.grey,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              _ProfileDropdown(isDark: isDark, showName: !isMobile),
-            ]),
+                const SizedBox(width: 12),
+                _ProfileDropdown(isDark: isDark, showName: !isMobile),
+              ],
+            ),
           ),
         ),
       ),
@@ -198,7 +278,7 @@ class _ProfileDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name    = SessionHelper.currentName;
+    final name = SessionHelper.currentName;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
     final isGuest = SessionHelper.isGuest;
 
@@ -224,15 +304,23 @@ class _ProfileDropdown extends StatelessWidget {
               if (isGuest)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text('Mode Tamu', style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 11, color: AppTheme.warning,
-                    fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Mode Tamu',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 11,
+                      color: AppTheme.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -248,20 +336,29 @@ class _ProfileDropdown extends StatelessWidget {
           child: Text('Keluar', style: TextStyle(color: Colors.red)),
         ),
       ],
-      child: Row(children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: isGuest ? AppTheme.warning : AppTheme.primary,
-          child: Text(initial,
-            style: const TextStyle(color: Colors.white, fontSize: 12)),
-        ),
-        if (showName) ...[
-          const SizedBox(width: 8),
-          Text(name, style: TextStyle(fontSize: 13,
-            color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: isGuest ? AppTheme.warning : AppTheme.primary,
+            child: Text(
+              initial,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+          if (showName) ...[
+            const SizedBox(width: 8),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+              ),
+            ),
+          ],
+          const Icon(Icons.arrow_drop_down),
         ],
-        const Icon(Icons.arrow_drop_down),
-      ]),
+      ),
     );
   }
 }

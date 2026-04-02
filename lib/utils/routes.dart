@@ -88,7 +88,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsPage(),
+        builder: (context, state) =>
+            SettingsPage(section: state.extra as String?),
       ),
       GoRoute(
         path: '/category',

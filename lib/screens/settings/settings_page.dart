@@ -4,13 +4,15 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/session_helper.dart';
 import '../../utils/theme_provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../utils/routes.dart';
 import '../../widgets/loading_button.dart';
 import '../../utils/remote_helper.dart';
 import '../../utils/shared_preference_helper.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  final String? section; // 'profile', 'theme', 'notif', 'about'
+  const SettingsPage({super.key, this.section});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -22,9 +24,15 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Baca argument dari route
+    // Baca section dari widget param atau GoRouter extra
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final arg = ModalRoute.of(context)?.settings.arguments as String?;
+      // Prioritas: widget.section (dari GoRoute path param)
+      // Fallback: GoRouter extra (dari context.push extra)
+      String? arg = widget.section;
+      if (arg == null || arg.isEmpty) {
+        final extra = GoRouterState.of(context).extra;
+        if (extra is String) arg = extra;
+      }
       if (arg == 'theme')
         setState(() => _selectedSection = 1);
       else if (arg == 'notif')
