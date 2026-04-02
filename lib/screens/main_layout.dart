@@ -127,59 +127,35 @@ class _MainLayoutState extends State<MainLayout> with RouteAware {
       child: Scaffold(
         appBar: _buildAppBar(context, isDark, isMobile),
         body: widget.navigationShell,
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: widget.navigationShell.currentIndex,
-          onTap: _onTap,
-          selectedItemColor: AppTheme.primary,
-          unselectedItemColor: isDark ? AppTheme.darkTextSub : Colors.grey,
-          type: BottomNavigationBarType.fixed,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.swap_horiz_rounded),
-                  if (isGuest)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Icon(
-                        Icons.lock_rounded,
-                        size: 10,
-                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
-                      ),
-                    ),
+        bottomNavigationBar: isGuest
+            ? null
+            : BottomNavigationBar(
+                currentIndex: widget.navigationShell.currentIndex,
+                onTap: _onTap,
+                selectedItemColor: AppTheme.primary,
+                unselectedItemColor: isDark
+                    ? AppTheme.darkTextSub
+                    : Colors.grey,
+                type: BottomNavigationBarType.fixed,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.dashboard_rounded),
+                    label: 'Dashboard',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.swap_horiz_rounded),
+                    label: 'Transaksi',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.science_rounded),
+                    label: 'Peralatan',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.people_rounded),
+                    label: 'User',
+                  ),
                 ],
               ),
-              label: 'Transaksi',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.science_rounded),
-              label: 'Peralatan',
-            ),
-            BottomNavigationBarItem(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.people_rounded),
-                  if (isGuest)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Icon(
-                        Icons.lock_rounded,
-                        size: 10,
-                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
-                      ),
-                    ),
-                ],
-              ),
-              label: 'User',
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -326,11 +302,11 @@ class _ProfileDropdown extends StatelessWidget {
           ),
         ),
         const PopupMenuDivider(),
-        if (!isGuest) ...[
+        if (!isGuest)
           const PopupMenuItem(value: 'profile', child: Text('Edit Profile')),
-          const PopupMenuItem(value: 'theme', child: Text('Ubah Tema')),
-          const PopupMenuDivider(),
-        ],
+
+        const PopupMenuItem(value: 'theme', child: Text('Ubah Tema')),
+        const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'logout',
           child: Text('Keluar', style: TextStyle(color: Colors.red)),
