@@ -181,8 +181,8 @@ class DataTableCard extends StatelessWidget {
     final labelColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
 
     return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: false,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
       itemCount: rows.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
