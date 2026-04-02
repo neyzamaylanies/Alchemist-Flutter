@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/remote_helper.dart';
 import '../../widgets/data_table_card.dart';
-import '../../widgets/loading_button.dart';
 
 class CategoryListPage extends StatefulWidget {
   const CategoryListPage({super.key});
-
   @override
   State<CategoryListPage> createState() => _CategoryListPageState();
 }
@@ -29,7 +27,11 @@ class _CategoryListPageState extends State<CategoryListPage> {
     try {
       final res = await RemoteHelper.getDio().get('api/categories');
       final data = (res.data['data'] as List<dynamic>?) ?? [];
-      setState(() { _categories = data; _filtered = data; _isLoading = false; });
+      setState(() {
+        _categories = data;
+        _filtered = data;
+        _isLoading = false;
+      });
     } catch (_) {
       setState(() => _isLoading = false);
     }
@@ -38,52 +40,95 @@ class _CategoryListPageState extends State<CategoryListPage> {
   void _onSearch(String q) {
     setState(() {
       _search = q.toLowerCase();
-      _filtered = _categories.where((c) =>
-        (c['categoryName'] ?? '').toLowerCase().contains(_search) ||
-        (c['id'] ?? '').toLowerCase().contains(_search)
-      ).toList();
+      _filtered = _categories
+          .where(
+            (c) =>
+                (c['categoryName'] ?? '').toLowerCase().contains(_search) ||
+                (c['id'] ?? '').toLowerCase().contains(_search),
+          )
+          .toList();
     });
   }
 
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(fontFamily: AppTheme.fontFamily)),
-      backgroundColor: isError ? AppTheme.error : AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(fontFamily: AppTheme.fontFamily),
+        ),
+        backgroundColor: isError ? AppTheme.error : AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  String _nextId() {
+    const prefix = 'CAT';
+    int max = 0;
+    for (final item in _categories) {
+      final id = (item['id'] ?? '') as String;
+      if (id.startsWith(prefix)) {
+        final num = int.tryParse(id.substring(prefix.length)) ?? 0;
+        if (num > max) max = num;
+      }
+    }
+    return '$prefix${(max + 1).toString().padLeft(3, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
+    final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : AppTheme.background,
       appBar: AppBar(
-        title: const Text('Kategori',
-          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600, fontSize: 16)),
-        backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surface,
+        title: const Text(
+          'Kategori',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
         foregroundColor: isDark ? AppTheme.darkText : AppTheme.textPrimary,
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+          child: Divider(
+            height: 1,
+            color: isDark ? AppTheme.darkBorder : const Color(0xFFE8E8F0),
+          ),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: ElevatedButton.icon(
-              onPressed: () => _showCreateDialog(context),
+              onPressed: () => _showFormBottomSheet(context),
               icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Tambah',
-                style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13)),
+              label: const Text(
+                'Tambah',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 elevation: 0,
               ),
             ),
@@ -93,27 +138,53 @@ class _CategoryListPageState extends State<CategoryListPage> {
       body: Column(
         children: [
           Container(
-            color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+            color: isDark ? AppTheme.darkSurface : Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: SizedBox(
-              height: 42,
-              child: TextField(
-                onChanged: _onSearch,
-                style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Cari kategori...',
-                  prefixIcon: Icon(Icons.search_rounded, size: 18,
-                    color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-                  filled: true,
-                  fillColor: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+            child: TextField(
+              onChanged: _onSearch,
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 13,
+                color: textColor,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Cari kategori...',
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 18,
+                  color: subColor,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 0,
+                ),
+                constraints: const BoxConstraints(maxHeight: 42),
+                filled: true,
+                fillColor: isDark
+                    ? AppTheme.darkSurfaceVar
+                    : AppTheme.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? AppTheme.darkBorder
+                        : const Color(0xFFE8E8F0),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? AppTheme.darkBorder
+                        : const Color(0xFFE8E8F0),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primary,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -124,27 +195,54 @@ class _CategoryListPageState extends State<CategoryListPage> {
               emptyMessage: 'Belum ada kategori',
               emptyIcon: Icons.category_rounded,
               headers: const ['ID', 'NAMA KATEGORI', 'DESKRIPSI', 'AKSI'],
-              rows: _filtered.map((c) => [
-                Text(c['id'] ?? '', style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontSize: 12, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
-                Text(c['categoryName'] ?? '', style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
-                Text(c['description'] ?? '-', style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontSize: 12, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
-                Row(children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit_rounded, size: 18, color: AppTheme.primary),
-                    tooltip: 'Edit',
-                    onPressed: () => _showEditDialog(context, c),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_rounded, size: 18, color: AppTheme.error),
-                    tooltip: 'Hapus',
-                    onPressed: () => _showDeleteDialog(context, c),
-                  ),
-                ]),
-              ]).toList(),
+              rows: _filtered
+                  .map(
+                    (c) => [
+                      Text(
+                        c['id'] ?? '',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 12,
+                          color: subColor,
+                        ),
+                      ),
+                      Text(
+                        c['categoryName'] ?? '',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                      Text(
+                        c['description'] ?? '-',
+                        style: TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 12,
+                          color: subColor,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          ActionButton(
+                            icon: Icons.edit_rounded,
+                            color: AppTheme.primary,
+                            tooltip: 'Edit',
+                            onTap: () => _showFormBottomSheet(context, cat: c),
+                          ),
+                          const SizedBox(width: 6),
+                          ActionButton(
+                            icon: Icons.delete_rounded,
+                            color: AppTheme.error,
+                            tooltip: 'Hapus',
+                            onTap: () => _showDeleteDialog(context, c),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -152,165 +250,357 @@ class _CategoryListPageState extends State<CategoryListPage> {
     );
   }
 
-  // ─── Create ───────────────────────────────────────────────────────────────
-  void _showCreateDialog(BuildContext context) {
-    final idCtrl = TextEditingController();
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
+  // ── Form bottom sheet (Create & Edit) ──────────────────────────────────────
+  void _showFormBottomSheet(BuildContext context, {Map<String, dynamic>? cat}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCreate = cat == null;
+    final generatedId = isCreate ? _nextId() : (cat!['id'] ?? '');
+    final nameCtrl = TextEditingController(
+      text: isCreate ? '' : cat!['categoryName'] ?? '',
+    );
+    final descCtrl = TextEditingController(
+      text: isCreate ? '' : cat!['description'] ?? '',
+    );
     bool loading = false;
 
-    showDialog(
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE8E8F0);
+    final fillColor = isDark ? AppTheme.darkSurfaceVar : Colors.white;
+    final subColor = isDark ? AppTheme.darkTextSub : AppTheme.textSecondary;
+    final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
+
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Tambah Kategori',
-            style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-          content: SizedBox(
-            width: 400,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _field('ID Kategori', idCtrl, 'Contoh: CAT001'),
-              const SizedBox(height: 12),
-              _field('Nama Kategori', nameCtrl, 'Contoh: Elektronik'),
-              const SizedBox(height: 12),
-              _field('Deskripsi', descCtrl, 'Deskripsi kategori'),
-            ]),
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            LoadingButton(
-              isLoading: loading,
-              text: 'Simpan',
-              onPressed: () async {
-                if (idCtrl.text.isEmpty || nameCtrl.text.isEmpty) {
-                  _showSnack('ID dan Nama wajib diisi!', isError: true);
-                  return;
-                }
-                // Cek duplikat ID
-                final isDuplicate = _categories.any((c) => c['id'] == idCtrl.text.trim());
-                if (isDuplicate) {
-                  _showSnack('ID "${idCtrl.text}" sudah ada!', isError: true);
-                  return;
-                }
-                setStateDialog(() => loading = true);
-                try {
-                  await RemoteHelper.getDio().post('api/categories', data: {
-                    'id': idCtrl.text.trim(),
-                    'categoryName': nameCtrl.text,
-                    'description': descCtrl.text,
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _loadCategories();
-                  _showSnack('Kategori berhasil ditambahkan!');
-                } catch (_) {
-                  setStateDialog(() => loading = false);
-                  _showSnack('Gagal menambahkan kategori!', isError: true);
-                }
-              },
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppTheme.darkBorder
+                          : const Color(0xFFE0E0E8),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isCreate ? 'Tambah Kategori' : 'Edit Kategori',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ID (read-only)
+                Text(
+                  'ID Kategori',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: subColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.darkSurfaceVar
+                        : const Color(0xFFF0F0F8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Text(
+                    generatedId,
+                    style: const TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Nama Kategori
+                Text(
+                  'Nama Kategori',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: subColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameCtrl,
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                    color: textColor,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: Elektronik',
+                    hintStyle: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      color: subColor,
+                    ),
+                    filled: true,
+                    fillColor: fillColor,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Deskripsi
+                Text(
+                  'Deskripsi',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: subColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                    color: textColor,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Deskripsi kategori (opsional)',
+                    hintStyle: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      color: subColor,
+                    ),
+                    filled: true,
+                    fillColor: fillColor,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: const BorderSide(color: AppTheme.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: loading
+                            ? null
+                            : () async {
+                                if (nameCtrl.text.isEmpty) {
+                                  _showSnack(
+                                    'Nama wajib diisi!',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
+                                setS(() => loading = true);
+                                try {
+                                  if (isCreate) {
+                                    await RemoteHelper.getDio().post(
+                                      'api/categories',
+                                      data: {
+                                        'id': generatedId,
+                                        'categoryName': nameCtrl.text,
+                                        'description': descCtrl.text,
+                                      },
+                                    );
+                                    _showSnack(
+                                      'Kategori berhasil ditambahkan!',
+                                    );
+                                  } else {
+                                    await RemoteHelper.getDio().put(
+                                      'api/categories/$generatedId',
+                                      data: {
+                                        'categoryName': nameCtrl.text,
+                                        'description': descCtrl.text,
+                                      },
+                                    );
+                                    _showSnack('Kategori berhasil diupdate!');
+                                  }
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  _loadCategories();
+                                } catch (_) {
+                                  setS(() => loading = false);
+                                  _showSnack(
+                                    isCreate
+                                        ? 'Gagal menambahkan!'
+                                        : 'Gagal mengupdate!',
+                                    isError: true,
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                isCreate ? 'Tambah' : 'Simpan',
+                                style: const TextStyle(
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // ─── Edit ─────────────────────────────────────────────────────────────────
-  void _showEditDialog(BuildContext context, Map<String, dynamic> cat) {
-    final nameCtrl = TextEditingController(text: cat['categoryName']);
-    final descCtrl = TextEditingController(text: cat['description']);
-    bool loading = false;
-
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Edit Kategori — ${cat['id']}',
-            style: const TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-          content: SizedBox(
-            width: 400,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _field('Nama Kategori', nameCtrl, 'Nama kategori'),
-              const SizedBox(height: 12),
-              _field('Deskripsi', descCtrl, 'Deskripsi kategori'),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            LoadingButton(
-              isLoading: loading,
-              text: 'Simpan',
-              onPressed: () async {
-                setStateDialog(() => loading = true);
-                try {
-                  await RemoteHelper.getDio().put('api/categories/${cat['id']}', data: {
-                    'categoryName': nameCtrl.text,
-                    'description': descCtrl.text,
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _loadCategories();
-                  _showSnack('Kategori berhasil diupdate!');
-                } catch (_) {
-                  setStateDialog(() => loading = false);
-                  _showSnack('Gagal mengupdate kategori!', isError: true);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Delete ───────────────────────────────────────────────────────────────
   void _showDeleteDialog(BuildContext context, Map<String, dynamic> cat) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Kategori',
-          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-        content: Text('Yakin ingin menghapus "${cat['categoryName']}"?',
-          style: const TextStyle(fontFamily: AppTheme.fontFamily)),
+        title: const Text(
+          'Hapus Kategori',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Yakin ingin menghapus "${cat['categoryName']}"?',
+          style: const TextStyle(fontFamily: AppTheme.fontFamily),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             onPressed: () async {
+              Navigator.pop(dialogCtx);
               try {
-                await RemoteHelper.getDio().delete('api/categories/${cat['id']}');
-                if (context.mounted) Navigator.pop(context);
+                await RemoteHelper.getDio().delete(
+                  'api/categories/${cat['id']}',
+                );
                 _loadCategories();
                 _showSnack('Kategori berhasil dihapus!');
               } catch (_) {
-                if (context.mounted) Navigator.pop(context);
-                _showSnack('Gagal menghapus kategori!', isError: true);
+                _showSnack('Gagal menghapus!', isError: true);
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.error, foregroundColor: Colors.white),
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Hapus'),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _field(String label, TextEditingController ctrl, String hint) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: ctrl,
-          style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-            color: isDark ? AppTheme.darkText : AppTheme.textPrimary),
-          decoration: InputDecoration(hintText: hint),
-        ),
-      ],
     );
   }
 }

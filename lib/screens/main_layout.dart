@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../blocs/equipment/equipment_list_bloc.dart';
 import '../blocs/transaction/transaction_list_bloc.dart';
@@ -14,19 +13,21 @@ import '../repositories/student_repository.dart';
 import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
 import '../utils/session_helper.dart';
-import '../utils/theme_provider.dart';
-import '../utils/routes.dart';
+
+// Global RouteObserver — daftarkan di GoRouter kamu:
+// navigatorObservers: [routeObserver]
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 class MainLayout extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
-
   const MainLayout({super.key, required this.navigationShell});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends State<MainLayout> with RouteAware {
   late final EquipmentListBloc _equipmentBloc;
   late final TransactionListBloc _transactionBloc;
   late final StudentListBloc _studentBloc;
@@ -48,16 +49,28 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) routeObserver.subscribe(this, route);
+  }
+
+  /// Otomatis refresh saat user kembali dari sub-page (Kategori, Kondisi Log, dll)
+  @override
+  void didPopNext() {
+    _refreshByIndex(widget.navigationShell.currentIndex);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _equipmentBloc.close();
     _transactionBloc.close();
     _studentBloc.close();
     super.dispose();
   }
 
-  void _onTap(int index) {
-    widget.navigationShell.goBranch(index);
-    // Reload data fresh setiap pindah tab (fitur dari branch main)
+  void _refreshByIndex(int index) {
     switch (index) {
       case 0:
         _equipmentBloc.add(LoadEquipmentListEvent());
@@ -76,10 +89,34 @@ class _MainLayoutState extends State<MainLayout> {
     }
   }
 
+  void _onTap(int index) {
+    // Guest hanya bisa ke tab Peralatan (index 2)
+    if (SessionHelper.isGuest && index != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Mode tamu hanya bisa melihat Peralatan.',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    widget.navigationShell.goBranch(index);
+    _refreshByIndex(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final isGuest = SessionHelper.isGuest;
 
     return MultiBlocProvider(
       providers: [
@@ -96,21 +133,49 @@ class _MainLayoutState extends State<MainLayout> {
           selectedItemColor: AppTheme.primary,
           unselectedItemColor: isDark ? AppTheme.darkTextSub : Colors.grey,
           type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.swap_horiz_rounded),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded),
+                  if (isGuest)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 10,
+                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
               label: 'Transaksi',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.science_rounded),
               label: 'Peralatan',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.people_rounded),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.people_rounded),
+                  if (isGuest)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 10,
+                        color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
               label: 'User',
             ),
           ],
@@ -156,7 +221,6 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 const SizedBox(width: 12),
-                // Search Bar (Fitur branch main)
                 Expanded(
                   child: GestureDetector(
                     onTap: () => context.push('/search'),
@@ -216,6 +280,7 @@ class _ProfileDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = SessionHelper.currentName;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    final isGuest = SessionHelper.isGuest;
 
     return PopupMenuButton<String>(
       offset: const Offset(0, 48),
@@ -225,22 +290,47 @@ class _ProfileDropdown extends StatelessWidget {
           SessionHelper.clearSession();
           context.go('/login');
         } else {
-          // Navigasi ke settings dengan argument tab spesifik (fitur main)
           context.push('/settings', extra: value);
         }
       },
       itemBuilder: (context) => [
         PopupMenuItem(
           enabled: false,
-          child: Text(
-            name,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              if (isGuest)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Mode Tamu',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 11,
+                      color: AppTheme.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem(value: 'profile', child: Text('Edit Profile')),
-        const PopupMenuItem(value: 'theme', child: Text('Ubah Tema')),
-        const PopupMenuDivider(),
+        if (!isGuest) ...[
+          const PopupMenuItem(value: 'profile', child: Text('Edit Profile')),
+          const PopupMenuItem(value: 'theme', child: Text('Ubah Tema')),
+          const PopupMenuDivider(),
+        ],
         const PopupMenuItem(
           value: 'logout',
           child: Text('Keluar', style: TextStyle(color: Colors.red)),
@@ -250,7 +340,7 @@ class _ProfileDropdown extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: AppTheme.primary,
+            backgroundColor: isGuest ? AppTheme.warning : AppTheme.primary,
             child: Text(
               initial,
               style: const TextStyle(color: Colors.white, fontSize: 12),
