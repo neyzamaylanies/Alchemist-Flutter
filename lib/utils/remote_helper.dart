@@ -1,14 +1,24 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:dio/dio.dart';
 import 'shared_preference_helper.dart';
 
 class RemoteHelper {
   static Dio? _dio;
 
-  static const String baseUrl = String.fromEnvironment(
-    'BASE_URL',
-    defaultValue:
-        'http://localhost:8080/', // Ganti dengan URL default jika tidak ada di environment
-  );
+  // URL dinamis menyesuaikan environment saat ini
+  static String get baseUrl {
+    if (kIsWeb) {
+      // Jika dijalankan di Web (Chrome/Edge dll)
+      return 'http://localhost:8080/';
+    } else if (Platform.isAndroid) {
+      // Jika dijalankan di Emulator Android
+      return 'http://192.168.1.5:8080/';
+    } else {
+      // Jika dijalankan di Windows, iOS Simulator, macOS, dll
+      return 'http://localhost:8080/';
+    }
+  }
 
   static Dio getDio() {
     if (_dio != null) return _dio!;

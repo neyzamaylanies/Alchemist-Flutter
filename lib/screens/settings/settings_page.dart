@@ -40,8 +40,24 @@ class _SettingsPageState extends State<SettingsPage> {
       else if (arg == 'about')
         setState(() => _selectedSection = 3);
       else
-        setState(() => _selectedSection = 0);
+        setState(() => _selectedSection = SessionHelper.isGuest ? 1 : 0);
     });
+  }
+
+  // List menu dinamis: Tamu cuma dapet Tema dan Tentang
+  List<Map<String, dynamic>> get _availableMenus {
+    if (SessionHelper.isGuest) {
+      return [
+        {'id': 1, 'icon': Icons.dark_mode_rounded, 'label': 'Tema'},
+        {'id': 3, 'icon': Icons.info_rounded, 'label': 'Tentang'},
+      ];
+    }
+    return [
+      {'id': 0, 'icon': Icons.person_rounded, 'label': 'Profil'},
+      {'id': 1, 'icon': Icons.dark_mode_rounded, 'label': 'Tema'},
+      {'id': 2, 'icon': Icons.notifications_rounded, 'label': 'Notif'},
+      {'id': 3, 'icon': Icons.info_rounded, 'label': 'Tentang'},
+    ];
   }
 
   @override
@@ -86,20 +102,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSideMenu(bool isDark, Color textColor) {
-    final items = [
-      (Icons.person_rounded, 'Edit Profile'),
-      (Icons.dark_mode_rounded, 'Tema'),
-      (Icons.notifications_rounded, 'Notifikasi'),
-      (Icons.info_rounded, 'Tentang App'),
-    ];
+    final menus = _availableMenus;
     return Container(
       width: 200,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
-        children: items.asMap().entries.map((e) {
-          final isSelected = _selectedSection == e.key;
+        children: menus.map((menu) {
+          final isSelected = _selectedSection == menu['id'];
           return GestureDetector(
-            onTap: () => setState(() => _selectedSection = e.key),
+            onTap: () => setState(() => _selectedSection = menu['id'] as int),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -112,7 +123,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Row(
                 children: [
                   Icon(
-                    e.value.$1,
+                    menu['icon'] as IconData,
                     size: 18,
                     color: isSelected
                         ? AppTheme.primary
@@ -122,7 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    e.value.$2,
+                    menu['label'] as String,
                     style: TextStyle(
                       fontFamily: AppTheme.fontFamily,
                       fontSize: 13,
@@ -142,27 +153,22 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildBottomTabs(bool isDark) {
+    final menus = _availableMenus;
+    // Cari index menu yang sedang aktif
+    int currentIndex = menus.indexWhere((m) => m['id'] == _selectedSection);
+    if (currentIndex == -1) currentIndex = 0; // Fallback aman
+
     return BottomNavigationBar(
-      currentIndex: _selectedSection,
-      onTap: (i) => setState(() => _selectedSection = i),
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_rounded),
-          label: 'Profil',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dark_mode_rounded),
-          label: 'Tema',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.notifications_rounded),
-          label: 'Notif',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.info_rounded),
-          label: 'Tentang',
-        ),
-      ],
+      currentIndex: currentIndex,
+      onTap: (i) => setState(() => _selectedSection = menus[i]['id'] as int),
+      items: menus
+          .map(
+            (m) => BottomNavigationBarItem(
+              icon: Icon(m['icon'] as IconData),
+              label: m['label'] as String,
+            ),
+          )
+          .toList(),
     );
   }
 
