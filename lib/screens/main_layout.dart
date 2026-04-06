@@ -1,34 +1,76 @@
-// lib/screens/main_layout.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
 import '../blocs/equipment/equipment_list_bloc.dart';
 import '../blocs/transaction/transaction_list_bloc.dart';
 import '../blocs/student/student_list_bloc.dart';
+
 import '../repositories/equipment_repository.dart';
 import '../repositories/transaction_repository.dart';
 import '../repositories/student_repository.dart';
+
 import '../utils/remote_helper.dart';
 import '../utils/app_theme.dart';
-import '../utils/routes.dart';
 import '../utils/session_helper.dart';
-import 'home/home_page.dart';
-import 'equipment/equipment_list_page.dart';
-import 'transaction/transaction_list_page.dart';
-import 'user/user_tab_page.dart';
+
+// Global RouteObserver — daftarkan di GoRouter kamu:
+// navigatorObservers: [routeObserver]
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final StatefulNavigationShell navigationShell;
+  const MainLayout({super.key, required this.navigationShell});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
-  int _selectedIndex = 0;
+class _MainLayoutState extends State<MainLayout> with RouteAware {
+  late final EquipmentListBloc _equipmentBloc;
+  late final TransactionListBloc _transactionBloc;
+  late final StudentListBloc _studentBloc;
 
-  void _onTabTapped(int index) {
-    setState(() => _selectedIndex = index);
-    // Reload API setiap pindah tab supaya data selalu fresh
+  @override
+  void initState() {
+    super.initState();
+    _equipmentBloc = EquipmentListBloc(
+      equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
+    )..add(LoadEquipmentListEvent());
+
+    _transactionBloc = TransactionListBloc(
+      transactionRepository: TransactionRepository(RemoteHelper.getDio()),
+    )..add(LoadTransactionListEvent());
+
+    _studentBloc = StudentListBloc(
+      studentRepository: StudentRepository(RemoteHelper.getDio()),
+    )..add(LoadStudentListEvent());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) routeObserver.subscribe(this, route);
+  }
+
+  /// Otomatis refresh saat user kembali dari sub-page (Kategori, Kondisi Log, dll)
+  @override
+  void didPopNext() {
+    _refreshByIndex(widget.navigationShell.currentIndex);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    _equipmentBloc.close();
+    _transactionBloc.close();
+    _studentBloc.close();
+    super.dispose();
+  }
+
+  void _refreshByIndex(int index) {
     switch (index) {
       case 0:
         _equipmentBloc.add(LoadEquipmentListEvent());
@@ -47,153 +89,146 @@ class _MainLayoutState extends State<MainLayout> {
     }
   }
 
-  final EquipmentListBloc _equipmentBloc = EquipmentListBloc(
-    equipmentRepository: EquipmentRepository(RemoteHelper.getDio()),
-  );
-  final TransactionListBloc _transactionBloc = TransactionListBloc(
-    transactionRepository: TransactionRepository(RemoteHelper.getDio()),
-  );
-  final StudentListBloc _studentBloc = StudentListBloc(
-    studentRepository: StudentRepository(RemoteHelper.getDio()),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _equipmentBloc.add(LoadEquipmentListEvent());
-    _transactionBloc.add(LoadTransactionListEvent());
-    _studentBloc.add(LoadStudentListEvent());
-  }
-
-  @override
-  void dispose() {
-    _equipmentBloc.close();
-    _transactionBloc.close();
-    _studentBloc.close();
-    super.dispose();
-  }
-
-  Widget _buildPage() {
-    switch (_selectedIndex) {
-      case 0:
-        return HomePage(
-          equipmentBloc: _equipmentBloc,
-          transactionBloc: _transactionBloc,
-          studentBloc: _studentBloc,
-          onNavigate: _onTabTapped,
-        );
-      case 1:
-        return TransactionListPage(transactionBloc: _transactionBloc);
-      case 2:
-        return EquipmentListPage(equipmentBloc: _equipmentBloc);
-      case 3:
-        return UserTabPage(studentBloc: _studentBloc);
-      default:
-        return HomePage(
-          equipmentBloc: _equipmentBloc,
-          transactionBloc: _transactionBloc,
-          studentBloc: _studentBloc,
-          onNavigate: _onTabTapped,
-        );
+  void _onTap(int index) {
+    // Guest hanya bisa ke tab Peralatan (index 2)
+    if (SessionHelper.isGuest && index != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Mode tamu hanya bisa melihat Peralatan.',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
     }
+
+    widget.navigationShell.goBranch(index);
+    _refreshByIndex(index);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isGuest = SessionHelper.isGuest;
 
     return MultiBlocProvider(
       providers: [
-        BlocProvider<EquipmentListBloc>.value(value: _equipmentBloc),
-        BlocProvider<TransactionListBloc>.value(value: _transactionBloc),
-        BlocProvider<StudentListBloc>.value(value: _studentBloc),
+        BlocProvider.value(value: _equipmentBloc),
+        BlocProvider.value(value: _transactionBloc),
+        BlocProvider.value(value: _studentBloc),
       ],
       child: Scaffold(
-        appBar: _buildAppBar(context, isDark),
-        body: _buildPage(),
-        bottomNavigationBar: _buildBottomNav(isDark),
+        appBar: _buildAppBar(context, isDark, isMobile),
+        body: widget.navigationShell,
+        bottomNavigationBar: isGuest
+            ? null
+            : BottomNavigationBar(
+                currentIndex: widget.navigationShell.currentIndex,
+                onTap: _onTap,
+                selectedItemColor: AppTheme.primary,
+                unselectedItemColor: isDark
+                    ? AppTheme.darkTextSub
+                    : Colors.grey,
+                type: BottomNavigationBarType.fixed,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.dashboard_rounded),
+                    label: 'Dashboard',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.swap_horiz_rounded),
+                    label: 'Transaksi',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.science_rounded),
+                    label: 'Peralatan',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.people_rounded),
+                    label: 'User',
+                  ),
+                ],
+              ),
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final bgColor = isDark ? AppTheme.darkSurface : AppTheme.surface;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB);
-
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    bool isDark,
+    bool isMobile,
+  ) {
     return PreferredSize(
       preferredSize: Size.fromHeight(isMobile ? 56 : 64),
       child: Container(
         decoration: BoxDecoration(
-          color: bgColor,
-          border: Border(bottom: BorderSide(color: borderColor)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+          color: isDark ? AppTheme.darkSurface : AppTheme.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
             ),
-          ],
+          ),
         ),
         child: SafeArea(
-          bottom: false,
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                // Logo
-                Container(
+                Image.asset(
+                  'assets/images/logo/LogoAlchemist.png',
                   width: 32,
                   height: 32,
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Image.asset(
-                    'assets/images/logo/LogoAlchemist.png',
-                    fit: BoxFit.fill,
-                  ),
                 ),
                 const SizedBox(width: 8),
-                if (!isMobile) ...[
+                if (!isMobile)
                   Text(
                     'Alchemist',
                     style: TextStyle(
                       fontFamily: AppTheme.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
                       color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                ],
-                // Search bar — lebih kecil di mobile
+                const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => Navigator.pushNamed(
-                      context, Routes.search, arguments: ''),
+                    onTap: () => context.push('/search'),
                     child: Container(
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        color: isDark ? AppTheme.darkSurfaceVar : AppTheme.background,
+                        color: isDark
+                            ? AppTheme.darkSurfaceVar
+                            : AppTheme.background,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+                          color: isDark
+                              ? AppTheme.darkBorder
+                              : const Color(0xFFE5E7EB),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.search_rounded, size: 15,
-                            color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              isMobile ? 'Cari...' : 'Cari peralatan, mahasiswa...',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: AppTheme.fontFamily, fontSize: 12,
-                                color: isDark ? AppTheme.darkTextSub : AppTheme.textMuted),
+                          Icon(
+                            Icons.search_rounded,
+                            size: 16,
+                            color: isDark ? AppTheme.darkTextSub : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Cari...',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppTheme.darkTextSub
+                                  : Colors.grey,
+                              fontSize: 13,
                             ),
                           ),
                         ],
@@ -201,7 +236,7 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 _ProfileDropdown(isDark: isDark, showName: !isMobile),
               ],
             ),
@@ -210,158 +245,94 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     );
   }
-
-  Widget _buildBottomNav(bool isDark) {
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: _onTabTapped,
-      backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surface,
-      selectedItemColor: AppTheme.primary,
-      unselectedItemColor: isDark ? AppTheme.darkTextSub : AppTheme.textMuted,
-      selectedLabelStyle: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 11),
-      type: BottomNavigationBarType.fixed,
-      elevation: 8,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-        BottomNavigationBarItem(icon: Icon(Icons.swap_horiz_rounded), label: 'Transaksi'),
-        BottomNavigationBarItem(icon: Icon(Icons.science_rounded), label: 'Peralatan'),
-        BottomNavigationBarItem(icon: Icon(Icons.people_rounded), label: 'User'),
-      ],
-    );
-  }
 }
 
-// ─── Profile Dropdown ──────────────────────────────────────────────────────
 class _ProfileDropdown extends StatelessWidget {
   final bool isDark;
   final bool showName;
-  const _ProfileDropdown({required this.isDark, this.showName = true});
+  const _ProfileDropdown({required this.isDark, required this.showName});
 
   @override
   Widget build(BuildContext context) {
     final name = SessionHelper.currentName;
-    final role = SessionHelper.currentRole;
-    final isAdmin = SessionHelper.isAdmin;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    final isGuest = SessionHelper.isGuest;
 
     return PopupMenuButton<String>(
-      offset: const Offset(0, 44),
+      offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: isDark ? AppTheme.darkSurface : AppTheme.surface,
-      onSelected: (value) => _onMenuSelected(context, value),
-      itemBuilder: (_) => [
-        PopupMenuItem<String>(
+      onSelected: (value) {
+        if (value == 'logout') {
+          SessionHelper.clearSession();
+          context.go('/login');
+        } else {
+          context.push('/settings', extra: value);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
           enabled: false,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: AppTheme.primary,
-              child: Text(initial,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: TextStyle(fontFamily: AppTheme.fontFamily,
-                fontWeight: FontWeight.w600, fontSize: 14,
-                color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isAdmin ? AppTheme.primary : AppTheme.success,
-                  borderRadius: BorderRadius.circular(4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              if (isGuest)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Mode Tamu',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 11,
+                      color: AppTheme.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                child: Text(role, style: const TextStyle(color: Colors.white,
-                  fontSize: 10, fontWeight: FontWeight.w600, fontFamily: AppTheme.fontFamily)),
-              ),
-            ]),
-          ]),
+            ],
+          ),
         ),
         const PopupMenuDivider(),
-        _menuItem('edit_profile', Icons.person_rounded, 'Edit Profile', isDark),
-        _menuItem('theme', Icons.dark_mode_rounded, 'Ubah Tema', isDark),
-        _menuItem('notif', Icons.notifications_rounded, 'Notifikasi', isDark),
-        _menuItem('about', Icons.info_rounded, 'Tentang App', isDark),
+        if (!isGuest)
+          const PopupMenuItem(value: 'profile', child: Text('Edit Profile')),
+
+        const PopupMenuItem(value: 'theme', child: Text('Ubah Tema')),
         const PopupMenuDivider(),
-        _menuItem('logout', Icons.logout_rounded, 'Keluar', isDark, isDestructive: true),
+        const PopupMenuItem(
+          value: 'logout',
+          child: Text('Keluar', style: TextStyle(color: Colors.red)),
+        ),
       ],
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: AppTheme.primary,
-            child: Text(initial,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            backgroundColor: isGuest ? AppTheme.warning : AppTheme.primary,
+            child: Text(
+              initial,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
           ),
           if (showName) ...[
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 100),
-              child: Text(name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppTheme.darkText : AppTheme.textPrimary)),
+            const SizedBox(width: 8),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? AppTheme.darkText : AppTheme.textPrimary,
+              ),
             ),
           ],
-          const SizedBox(width: 2),
-          Icon(Icons.keyboard_arrow_down_rounded, size: 16,
-            color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
-        ],
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, bool isDark,
-      {bool isDestructive = false}) {
-    final color = isDestructive ? AppTheme.error : (isDark ? AppTheme.darkText : AppTheme.textPrimary);
-    return PopupMenuItem<String>(
-      value: value,
-      child: Row(children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 12),
-        Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13, color: color)),
-      ]),
-    );
-  }
-
-  void _onMenuSelected(BuildContext context, String value) {
-    switch (value) {
-      case 'edit_profile':
-      case 'theme':
-      case 'notif':
-      case 'about':
-        Navigator.pushNamed(context, Routes.settings, arguments: value);
-        break;
-      case 'logout':
-        _showLogoutDialog(context);
-        break;
-    }
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Konfirmasi Keluar',
-          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
-        content: const Text('Apakah kamu yakin ingin keluar?',
-          style: TextStyle(fontFamily: AppTheme.fontFamily)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              SessionHelper.clearSession();
-              Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(context, Routes.splash, (r) => false);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
-            child: const Text('Keluar'),
-          ),
+          const Icon(Icons.arrow_drop_down),
         ],
       ),
     );

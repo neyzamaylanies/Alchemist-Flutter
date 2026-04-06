@@ -13,6 +13,7 @@ class SessionHelper {
   static String get currentRole => _userRole;
   static bool get isAdmin => _userRole == 'ADMIN';
   static bool get isLoggedIn => _userId.isNotEmpty;
+  static bool get isGuest => _userRole == 'GUEST';
 
   static void setSession({
     required String id,

@@ -4,12 +4,15 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/session_helper.dart';
 import '../../utils/theme_provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../utils/routes.dart';
 import '../../widgets/loading_button.dart';
 import '../../utils/remote_helper.dart';
+import '../../utils/shared_preference_helper.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  final String? section; // 'profile', 'theme', 'notif', 'about'
+  const SettingsPage({super.key, this.section});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -21,27 +24,58 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Baca argument dari route
+    // Baca section dari widget param atau GoRouter extra
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final arg = ModalRoute.of(context)?.settings.arguments as String?;
-      if (arg == 'theme')        setState(() => _selectedSection = 1);
-      else if (arg == 'notif')   setState(() => _selectedSection = 2);
-      else if (arg == 'about')   setState(() => _selectedSection = 3);
-      else                       setState(() => _selectedSection = 0);
+      // Prioritas: widget.section (dari GoRoute path param)
+      // Fallback: GoRouter extra (dari context.push extra)
+      String? arg = widget.section;
+      if (arg == null || arg.isEmpty) {
+        final extra = GoRouterState.of(context).extra;
+        if (extra is String) arg = extra;
+      }
+      if (arg == 'theme')
+        setState(() => _selectedSection = 1);
+      else if (arg == 'notif')
+        setState(() => _selectedSection = 2);
+      else if (arg == 'about')
+        setState(() => _selectedSection = 3);
+      else
+        setState(() => _selectedSection = SessionHelper.isGuest ? 1 : 0);
     });
+  }
+
+  // List menu dinamis: Tamu cuma dapet Tema dan Tentang
+  List<Map<String, dynamic>> get _availableMenus {
+    if (SessionHelper.isGuest) {
+      return [
+        {'id': 1, 'icon': Icons.dark_mode_rounded, 'label': 'Tema'},
+        {'id': 3, 'icon': Icons.info_rounded, 'label': 'Tentang'},
+      ];
+    }
+    return [
+      {'id': 0, 'icon': Icons.person_rounded, 'label': 'Profil'},
+      {'id': 1, 'icon': Icons.dark_mode_rounded, 'label': 'Tema'},
+      {'id': 2, 'icon': Icons.notifications_rounded, 'label': 'Notif'},
+      {'id': 3, 'icon': Icons.info_rounded, 'label': 'Tentang'},
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final bgColor   = isDark ? AppTheme.darkBg : AppTheme.background;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppTheme.darkBg : AppTheme.background;
     final textColor = isDark ? AppTheme.darkText : AppTheme.textPrimary;
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('Pengaturan',
-          style: TextStyle(fontFamily: AppTheme.fontFamily, fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Pengaturan',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -52,7 +86,10 @@ class _SettingsPageState extends State<SettingsPage> {
           // Sidebar menu (tablet/web) atau top tabs (mobile)
           if (MediaQuery.of(context).size.width > 600) ...[
             _buildSideMenu(isDark, textColor),
-            Container(width: 1, color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+            Container(
+              width: 1,
+              color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+            ),
           ],
           Expanded(child: _buildContent(isDark, textColor)),
         ],
@@ -65,20 +102,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSideMenu(bool isDark, Color textColor) {
-    final items = [
-      (Icons.person_rounded, 'Edit Profile'),
-      (Icons.dark_mode_rounded, 'Tema'),
-      (Icons.notifications_rounded, 'Notifikasi'),
-      (Icons.info_rounded, 'Tentang App'),
-    ];
+    final menus = _availableMenus;
     return Container(
       width: 200,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
-        children: items.asMap().entries.map((e) {
-          final isSelected = _selectedSection == e.key;
+        children: menus.map((menu) {
+          final isSelected = _selectedSection == menu['id'];
           return GestureDetector(
-            onTap: () => setState(() => _selectedSection = e.key),
+            onTap: () => setState(() => _selectedSection = menu['id'] as int),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -90,13 +122,27 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               child: Row(
                 children: [
-                  Icon(e.value.$1, size: 18,
-                    color: isSelected ? AppTheme.primary : (isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+                  Icon(
+                    menu['icon'] as IconData,
+                    size: 18,
+                    color: isSelected
+                        ? AppTheme.primary
+                        : (isDark
+                              ? AppTheme.darkTextSub
+                              : AppTheme.textSecondary),
+                  ),
                   const SizedBox(width: 10),
-                  Text(e.value.$2, style: TextStyle(
-                    fontFamily: AppTheme.fontFamily, fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected ? AppTheme.primary : textColor)),
+                  Text(
+                    menu['label'] as String,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: isSelected ? AppTheme.primary : textColor,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -107,25 +153,37 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildBottomTabs(bool isDark) {
+    final menus = _availableMenus;
+    // Cari index menu yang sedang aktif
+    int currentIndex = menus.indexWhere((m) => m['id'] == _selectedSection);
+    if (currentIndex == -1) currentIndex = 0; // Fallback aman
+
     return BottomNavigationBar(
-      currentIndex: _selectedSection,
-      onTap: (i) => setState(() => _selectedSection = i),
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
-        BottomNavigationBarItem(icon: Icon(Icons.dark_mode_rounded), label: 'Tema'),
-        BottomNavigationBarItem(icon: Icon(Icons.notifications_rounded), label: 'Notif'),
-        BottomNavigationBarItem(icon: Icon(Icons.info_rounded), label: 'Tentang'),
-      ],
+      currentIndex: currentIndex,
+      onTap: (i) => setState(() => _selectedSection = menus[i]['id'] as int),
+      items: menus
+          .map(
+            (m) => BottomNavigationBarItem(
+              icon: Icon(m['icon'] as IconData),
+              label: m['label'] as String,
+            ),
+          )
+          .toList(),
     );
   }
 
   Widget _buildContent(bool isDark, Color textColor) {
     switch (_selectedSection) {
-      case 0: return _EditProfileSection(isDark: isDark, textColor: textColor);
-      case 1: return _ThemeSection(isDark: isDark, textColor: textColor);
-      case 2: return _NotifSection(isDark: isDark, textColor: textColor);
-      case 3: return _AboutSection(isDark: isDark, textColor: textColor);
-      default: return const SizedBox();
+      case 0:
+        return _EditProfileSection(isDark: isDark, textColor: textColor);
+      case 1:
+        return _ThemeSection(isDark: isDark, textColor: textColor);
+      case 2:
+        return _NotifSection(isDark: isDark, textColor: textColor);
+      case 3:
+        return _AboutSection(isDark: isDark, textColor: textColor);
+      default:
+        return const SizedBox();
     }
   }
 }
@@ -141,8 +199,10 @@ class _EditProfileSection extends StatefulWidget {
 }
 
 class _EditProfileSectionState extends State<_EditProfileSection> {
-  late final _nameCtrl  = TextEditingController(text: SessionHelper.currentName);
-  late final _emailCtrl = TextEditingController(text: SessionHelper.currentEmail);
+  late final _nameCtrl = TextEditingController(text: SessionHelper.currentName);
+  late final _emailCtrl = TextEditingController(
+    text: SessionHelper.currentEmail,
+  );
   final _oldPassCtrl = TextEditingController();
   final _newPassCtrl = TextEditingController();
   bool _loading = false;
@@ -154,8 +214,15 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Edit Profile', style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 18, fontWeight: FontWeight.w700, color: widget.textColor)),
+          Text(
+            'Edit Profile',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: widget.textColor,
+            ),
+          ),
           const SizedBox(height: 20),
           // Avatar
           Center(
@@ -166,8 +233,13 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
                   backgroundColor: AppTheme.primary,
                   child: Text(
                     SessionHelper.currentName.isNotEmpty
-                        ? SessionHelper.currentName[0].toUpperCase() : 'U',
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                        ? SessionHelper.currentName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -175,24 +247,41 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
           ),
           const SizedBox(height: 24),
           _fieldLabel('Nama', widget.textColor),
-          TextField(controller: _nameCtrl,
-            decoration: const InputDecoration(hintText: 'Nama lengkap')),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(hintText: 'Nama lengkap'),
+          ),
           const SizedBox(height: 16),
           _fieldLabel('Email', widget.textColor),
-          TextField(controller: _emailCtrl,
+          TextField(
+            controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(hintText: 'email@contoh.com')),
+            decoration: const InputDecoration(hintText: 'email@contoh.com'),
+          ),
           const SizedBox(height: 24),
-          Text('Ganti Password', style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 15, fontWeight: FontWeight.w600, color: widget.textColor)),
+          Text(
+            'Ganti Password',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: widget.textColor,
+            ),
+          ),
           const SizedBox(height: 12),
           _fieldLabel('Password Lama', widget.textColor),
-          TextField(controller: _oldPassCtrl, obscureText: true,
-            decoration: const InputDecoration(hintText: '••••••••')),
+          TextField(
+            controller: _oldPassCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: '••••••••'),
+          ),
           const SizedBox(height: 12),
           _fieldLabel('Password Baru', widget.textColor),
-          TextField(controller: _newPassCtrl, obscureText: true,
-            decoration: const InputDecoration(hintText: '••••••••')),
+          TextField(
+            controller: _newPassCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: '••••••••'),
+          ),
           const SizedBox(height: 24),
           LoadingButton(
             isLoading: _loading,
@@ -207,7 +296,8 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
   void _onSave() async {
     if (_nameCtrl.text.isEmpty || _emailCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama dan email tidak boleh kosong!')));
+        const SnackBar(content: Text('Nama dan email tidak boleh kosong!')),
+      );
       return;
     }
     setState(() => _loading = true);
@@ -220,20 +310,31 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
           if (_newPassCtrl.text.isNotEmpty) 'password': _newPassCtrl.text,
         },
       );
+
       SessionHelper.setSession(
         id: SessionHelper.currentId,
         name: _nameCtrl.text,
         email: _emailCtrl.text,
         role: SessionHelper.currentRole,
       );
+
+      await SharedPreferenceHelper.saveUserInfo(
+        id: SessionHelper.currentId,
+        name: _nameCtrl.text,
+        email: _emailCtrl.text,
+        role: SessionHelper.currentRole,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil berhasil diperbarui!')));
+          const SnackBar(content: Text('Profil berhasil diperbarui!')),
+        );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal memperbarui profil')));
+          const SnackBar(content: Text('Gagal memperbarui profil')),
+        );
       }
     }
     setState(() => _loading = false);
@@ -242,9 +343,15 @@ class _EditProfileSectionState extends State<_EditProfileSection> {
   Widget _fieldLabel(String text, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(text, style: TextStyle(
-        fontFamily: AppTheme.fontFamily, fontSize: 13,
-        fontWeight: FontWeight.w500, color: color)),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: AppTheme.fontFamily,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -264,12 +371,24 @@ class _ThemeSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tema Aplikasi', style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 18, fontWeight: FontWeight.w700, color: textColor)),
+          Text(
+            'Tema Aplikasi',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Pilih tampilan yang nyaman untuk kamu',
-            style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-              color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+          Text(
+            'Pilih tampilan yang nyaman untuk kamu',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary,
+            ),
+          ),
           const SizedBox(height: 24),
           // Light mode card
           _ThemeCard(
@@ -297,18 +416,30 @@ class _ThemeSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: isDark ? AppTheme.darkSurface : AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+              border: Border.all(
+                color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+              ),
             ),
             child: Row(
               children: [
-                Icon(themeProvider.isDarkMode ? Icons.dark_mode_rounded : Icons.wb_sunny_rounded,
-                  color: AppTheme.primary),
+                Icon(
+                  themeProvider.isDarkMode
+                      ? Icons.dark_mode_rounded
+                      : Icons.wb_sunny_rounded,
+                  color: AppTheme.primary,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    themeProvider.isDarkMode ? 'Mode Gelap Aktif' : 'Mode Terang Aktif',
-                    style: TextStyle(fontFamily: AppTheme.fontFamily,
-                      fontWeight: FontWeight.w600, color: textColor)),
+                    themeProvider.isDarkMode
+                        ? 'Mode Gelap Aktif'
+                        : 'Mode Terang Aktif',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                    ),
+                  ),
                 ),
                 Switch(
                   value: themeProvider.isDarkMode,
@@ -329,8 +460,14 @@ class _ThemeCard extends StatelessWidget {
   final String title, subtitle;
   final bool isSelected, isDark;
   final VoidCallback onTap;
-  const _ThemeCard({required this.icon, required this.title, required this.subtitle,
-    required this.isSelected, required this.isDark, required this.onTap});
+  const _ThemeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -345,28 +482,54 @@ class _ThemeCard extends StatelessWidget {
               : (isDark ? AppTheme.darkSurface : AppTheme.surface),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppTheme.primary : (isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+            color: isSelected
+                ? AppTheme.primary
+                : (isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? AppTheme.primary : AppTheme.textSecondary, size: 24),
+            Icon(
+              icon,
+              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+              size: 24,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w600, fontSize: 14,
-                    color: isSelected ? AppTheme.primary : (isDark ? AppTheme.darkText : AppTheme.textPrimary))),
-                  Text(subtitle, style: TextStyle(fontFamily: AppTheme.fontFamily,
-                    fontSize: 12, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: isSelected
+                          ? AppTheme.primary
+                          : (isDark ? AppTheme.darkText : AppTheme.textPrimary),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 12,
+                      color: isDark
+                          ? AppTheme.darkTextSub
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppTheme.primary,
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -396,18 +559,33 @@ class _NotifSectionState extends State<_NotifSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Notifikasi', style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 18, fontWeight: FontWeight.w700, color: widget.textColor)),
+          Text(
+            'Notifikasi',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: widget.textColor,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Atur notifikasi yang ingin kamu terima',
-            style: TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13,
-              color: widget.isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+          Text(
+            'Atur notifikasi yang ingin kamu terima',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              color: widget.isDark
+                  ? AppTheme.darkTextSub
+                  : AppTheme.textSecondary,
+            ),
+          ),
           const SizedBox(height: 24),
           _NotifTile(
             icon: Icons.warning_rounded,
             iconColor: AppTheme.error,
             title: 'Alat Rusak',
-            subtitle: 'Notifikasi saat ada alat yang kondisinya berubah jadi rusak',
+            subtitle:
+                'Notifikasi saat ada alat yang kondisinya berubah jadi rusak',
             value: _notifAlatRusak,
             onChanged: (v) => setState(() => _notifAlatRusak = v),
             isDark: widget.isDark,
@@ -418,7 +596,8 @@ class _NotifSectionState extends State<_NotifSection> {
             icon: Icons.swap_horiz_rounded,
             iconColor: AppTheme.warning,
             title: 'Transaksi Baru',
-            subtitle: 'Notifikasi saat ada transaksi peminjaman atau pengembalian baru',
+            subtitle:
+                'Notifikasi saat ada transaksi peminjaman atau pengembalian baru',
             value: _notifTransaksi,
             onChanged: (v) => setState(() => _notifTransaksi = v),
             isDark: widget.isDark,
@@ -448,9 +627,16 @@ class _NotifTile extends StatelessWidget {
   final bool value, isDark;
   final Color textColor;
   final ValueChanged<bool> onChanged;
-  const _NotifTile({required this.icon, required this.iconColor, required this.title,
-    required this.subtitle, required this.value, required this.isDark,
-    required this.textColor, required this.onChanged});
+  const _NotifTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.isDark,
+    required this.textColor,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -459,7 +645,9 @@ class _NotifTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurface : AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+        ),
       ),
       child: Row(
         children: [
@@ -476,15 +664,34 @@ class _NotifTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.w600, fontSize: 14, color: textColor)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: textColor,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontSize: 12, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
+                    color: isDark
+                        ? AppTheme.darkTextSub
+                        : AppTheme.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged, activeColor: AppTheme.primary),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppTheme.primary,
+          ),
         ],
       ),
     );
@@ -504,8 +711,15 @@ class _AboutSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tentang Aplikasi', style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 18, fontWeight: FontWeight.w700, color: textColor)),
+          Text(
+            'Tentang Aplikasi',
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
           const SizedBox(height: 24),
           Center(
             child: Column(
@@ -516,26 +730,69 @@ class _AboutSection extends StatelessWidget {
                     color: const Color(0xFF3730A3),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Image.asset('assets/images/logo/LogoAlchemist.png',
-                    width: 80, height: 80, fit: BoxFit.fill),
+                  child: Image.asset(
+                    'assets/images/logo/LogoAlchemist.png',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.fill,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                Text('Alchemist', style: TextStyle(fontFamily: AppTheme.fontFamily,
-                  fontSize: 24, fontWeight: FontWeight.w700, color: textColor)),
+                Text(
+                  'Alchemist',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('Sistem Manajemen Inventory Laboratorium',
-                  style: TextStyle(fontFamily: AppTheme.fontFamily,
-                    fontSize: 13, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary),
-                  textAlign: TextAlign.center),
+                Text(
+                  'Sistem Manajemen Inventory Laboratorium',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                    color: isDark
+                        ? AppTheme.darkTextSub
+                        : AppTheme.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
           const SizedBox(height: 32),
-          _InfoTile(label: 'Versi Aplikasi', value: '1.0.0', isDark: isDark, textColor: textColor),
-          _InfoTile(label: 'Platform', value: 'Flutter (Android & Web)', isDark: isDark, textColor: textColor),
-          _InfoTile(label: 'Backend', value: 'Spring Boot REST API', isDark: isDark, textColor: textColor),
-          _InfoTile(label: 'Developer', value: 'Tim Alchemist — FTUI', isDark: isDark, textColor: textColor),
-          _InfoTile(label: 'Tahun', value: '2025', isDark: isDark, textColor: textColor),
+          _InfoTile(
+            label: 'Versi Aplikasi',
+            value: '1.0.0',
+            isDark: isDark,
+            textColor: textColor,
+          ),
+          _InfoTile(
+            label: 'Platform',
+            value: 'Flutter (Android & Web)',
+            isDark: isDark,
+            textColor: textColor,
+          ),
+          _InfoTile(
+            label: 'Backend',
+            value: 'Spring Boot REST API',
+            isDark: isDark,
+            textColor: textColor,
+          ),
+          _InfoTile(
+            label: 'Developer',
+            value: 'Tim Alchemist — FTUI',
+            isDark: isDark,
+            textColor: textColor,
+          ),
+          _InfoTile(
+            label: 'Tahun',
+            value: '2025',
+            isDark: isDark,
+            textColor: textColor,
+          ),
         ],
       ),
     );
@@ -546,8 +803,12 @@ class _InfoTile extends StatelessWidget {
   final String label, value;
   final bool isDark;
   final Color textColor;
-  const _InfoTile({required this.label, required this.value,
-    required this.isDark, required this.textColor});
+  const _InfoTile({
+    required this.label,
+    required this.value,
+    required this.isDark,
+    required this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -557,15 +818,30 @@ class _InfoTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurface : AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : const Color(0xFFE5E7EB),
+        ),
       ),
       child: Row(
         children: [
-          Text(label, style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 13, color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary)),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              color: isDark ? AppTheme.darkTextSub : AppTheme.textSecondary,
+            ),
+          ),
           const Spacer(),
-          Text(value, style: TextStyle(fontFamily: AppTheme.fontFamily,
-            fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
         ],
       ),
     );
